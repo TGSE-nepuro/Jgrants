@@ -12,9 +12,10 @@
     "build:main": "tsc -p tsconfig.electron.json",
     "build:renderer": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "ci:verify": "npm run typecheck && npm run test && npm run build",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "test": "npm run build:main && node --test tests/**/*.test.cjs"
+    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",
