@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GrantDetail, GrantSearchQuery, GrantSummary } from "../shared/types";
+import { logWarn } from "./logger";
 
 const V2_BASE_URL = "https://api.jgrants-portal.go.jp/v2";
 const V1_BASE_URL = "https://api.jgrants-portal.go.jp/v1";
@@ -199,6 +200,7 @@ export async function searchGrants(token: string, query: GrantSearchQuery): Prom
     throw new Error(`Search failed on v2: ${v2.status}`);
   }
 
+  logWarn("Fallback to v1 for search", { endpoint: "/subsidies", status: v2.status, query });
   const v1 = await requestJson(token, V1_BASE_URL, "/subsidies", params);
   if (v1.status >= 200 && v1.status < 300) {
     return parseSearchV1(v1.body);
@@ -217,6 +219,7 @@ export async function fetchGrantDetail(token: string, grantId: string): Promise<
     throw new Error(`Detail failed on v2: ${v2.status}`);
   }
 
+  logWarn("Fallback to v1 for detail", { endpoint: `/subsidies/${grantId}`, status: v2.status });
   const v1 = await requestJson(token, V1_BASE_URL, `/subsidies/${grantId}`);
   if (v1.status >= 200 && v1.status < 300) {
     return parseDetailV1(v1.body);

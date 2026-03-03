@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 import { ensureStore } from "./favorites-store";
+import { logError, logInfo } from "./logger";
 import "./ipc";
 
 function createWindow(): BrowserWindow {
@@ -25,6 +26,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   await ensureStore();
+  logInfo("Application ready", { platform: process.platform });
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -33,4 +35,12 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+process.on("uncaughtException", (error) => {
+  logError("Uncaught exception", { error: error.message, stack: error.stack });
+});
+
+process.on("unhandledRejection", (reason) => {
+  logError("Unhandled rejection", { reason });
 });
