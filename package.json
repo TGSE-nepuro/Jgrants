@@ -17,7 +17,8 @@
     "e2e:ci": "xvfb-run -a npm run e2e",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs tests/logger-core.test.cjs"
+    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs tests/logger-core.test.cjs tests/release-preflight.test.cjs",
+    "release:preflight": "node scripts/release-preflight.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -41,14 +42,26 @@
   },
   "build": {
     "appId": "jp.edamoto.jgrantsdesktop",
-    "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
-    "directories": { "buildResources": "build" },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true
     },
     "win": {
-      "target": ["nsis", "zip"]
+      "target": [
+        "nsis",
+        "zip"
+      ]
     }
   }
 }
