@@ -79,10 +79,24 @@ test('searchGrants throws combined error when v2 and v1 both fail', async () => 
   );
 });
 
-test('searchGrants returns empty list for malformed success payload', async () => {
+test('searchGrants rejects invalid v1 payload shape after fallback', async () => {
+  queueFetch([
+    { status: 404, body: { error: 'v2 unsupported' } },
+    { status: 200, body: { items: [{ subsidy_id: 's-1', name: '補助金A' }] } }
+  ]);
+
+  await assert.rejects(
+    () => searchGrants('token', { keyword: 'AI' }),
+    /Invalid v1 search payload/
+  );
+});
+
+test('searchGrants rejects malformed success payload', async () => {
   queueFetch([{ status: 200, body: { message: 'ok but no items key' } }]);
-  const result = await searchGrants('token', { keyword: 'cloud' });
-  assert.deepEqual(result, []);
+  await assert.rejects(
+    () => searchGrants('token', { keyword: 'cloud' }),
+    /Invalid v2 search payload/
+  );
 });
 
 test('searchGrants propagates network error', async () => {
@@ -139,9 +153,9 @@ test('fetchGrantDetail does not fallback on forbidden error', async () => {
   assert.equal(callCount, 1);
 });
 
-test('fetchGrantDetail throws when payload has no detail object', async () => {
+test('fetchGrantDetail rejects payload with no detail object', async () => {
   queueFetch([{ status: 200, body: { items: [] } }]);
-  await assert.rejects(() => fetchGrantDetail('token', 'x'), /Missing detail payload on v2/);
+  await assert.rejects(() => fetchGrantDetail('token', 'x'), /Invalid v2 detail payload/);
 });
 
 test('fetchGrantDetail throws combined error when both versions fail', async () => {
@@ -158,5 +172,5 @@ test('fetchGrantDetail throws combined error when both versions fail', async () 
 
 test('fetchGrantDetail handles invalid json response as missing payload', async () => {
   queueFetch([{ status: 200, body: null, jsonReject: true }]);
-  await assert.rejects(() => fetchGrantDetail('token', 'x3'), /Missing detail payload on v2/);
+  await assert.rejects(() => fetchGrantDetail('token', 'x3'), /Invalid v2 detail payload/);
 });

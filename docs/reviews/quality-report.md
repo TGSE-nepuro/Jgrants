@@ -13,15 +13,15 @@
 - Resolved-Medium-02: CSV出力未実装
   - Status: 対応済み
   - Fix: UI選択 + Main保存ダイアログ + CSV生成実装
-- Open-Medium-01: APIレスポンスマッピングが推定キー依存
-  - Impact: 仕様変更時に表示欠落の可能性
-  - Action: 公式スキーマ準拠のバリデーション追加
+- Resolved-Medium-01: APIレスポンスマッピングが推定キー依存
+  - Status: 対応済み
+  - Fix: `zod` スキーマで v1/v2 レスポンス形を明示検証し、構造不正時は明確に失敗させる実装へ変更
 
 ## Validation Results
 - `npm run typecheck`: pass
 - `npm run build`: pass
-- `npm run test`: pass (25 tests / 25 pass)
+- `npm run test`: pass (26 tests / 26 pass)
 
 ## Status
-- 重大品質指摘は解消済み
-- 中リスク1件を次フェーズで継続対応
+- 重大・中リスク品質指摘は解消済み
+- 継続改善項目は低リスク領域（ログ/運用監視）
