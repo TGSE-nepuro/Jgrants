@@ -68,6 +68,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Release preflight
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          RELEASE_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run release:preflight
+
       - name: Build distributables (signed when secrets are provided)
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
