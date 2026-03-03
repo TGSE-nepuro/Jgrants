@@ -13,9 +13,11 @@
     "build:renderer": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "ci:verify": "npm run typecheck && npm run test && npm run build",
+    "e2e": "npm run build && node --test tests/e2e/smoke.e2e.test.cjs",
+    "e2e:ci": "xvfb-run -a npm run e2e",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs"
+    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs tests/logger-core.test.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -32,6 +34,7 @@
     "cross-env": "^7.0.3",
     "electron": "^34.2.0",
     "electron-builder": "^25.1.8",
+    "playwright": "^1.51.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
@@ -40,7 +43,12 @@
     "appId": "jp.edamoto.jgrantsdesktop",
     "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
     "directories": { "buildResources": "build" },
-    "mac": { "target": ["dmg", "zip"] },
-    "win": { "target": ["nsis", "zip"] }
+    "mac": {
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": ["nsis", "zip"]
+    }
   }
 }
