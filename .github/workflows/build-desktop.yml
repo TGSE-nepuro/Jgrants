@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            run_e2e: true
-          - os: macos-latest
             run_e2e: false
+          - os: macos-latest
+            run_e2e: true
           - os: windows-latest
             run_e2e: false
 
@@ -40,9 +40,9 @@ jobs:
       - name: Run verify suite
         run: npm run ci:verify
 
-      - name: Run E2E smoke (Linux)
+      - name: Run E2E smoke
         if: matrix.run_e2e
-        run: npm run e2e:ci
+        run: npm run e2e
 
   package:
     name: Package (${{ matrix.os }})
