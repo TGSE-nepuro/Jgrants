@@ -1,0 +1,7 @@
+:root { font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; }
+body { margin: 0; background: #f5f7fb; }
+.app { padding: 16px; }
+header { display: flex; gap: 12px; align-items: center; }
+main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+section { background: #fff; border: 1px solid #d9e0ea; border-radius: 8px; padding: 12px; }
+.error { color: #b71c1c; }
