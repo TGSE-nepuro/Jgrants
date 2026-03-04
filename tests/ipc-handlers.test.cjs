@@ -19,6 +19,7 @@ function createDeps(overrides = {}) {
   return {
     searchGrants: async () => [],
     fetchGrantDetail: async () => ({ id: 'x', title: '', organization: '' }),
+    listRegions: async () => ['全国', '東京都'],
     listFavorites: async () => [],
     saveFavorite: async () => undefined,
     removeFavorite: async () => undefined,
@@ -41,10 +42,28 @@ test('registerIpcHandlers registers all expected channels', () => {
     'grants:detail',
     'grants:exportCsv',
     'grants:search',
+    'regions:list',
     'token:clear',
     'token:get',
     'token:set'
   ]);
+});
+
+test('regions:list validates token and forwards trace', async () => {
+  const { handlers, registrar } = createRegistrar();
+  const calls = [];
+  registerIpcHandlers(registrar, createDeps({
+    listRegions: async (token, trace) => {
+      calls.push({ token, trace });
+      return ['全国', '東京都'];
+    }
+  }));
+
+  const res = await handlers.get('regions:list')({}, 'token', { requestId: 'req-r1' });
+  assert.deepEqual(res, ['全国', '東京都']);
+  assert.deepEqual(calls, [{ token: 'token', trace: { requestId: 'req-r1' } }]);
+
+  assert.throws(() => handlers.get('regions:list')({}, ''));
 });
 
 test('grants:search validates and forwards token/query', async () => {

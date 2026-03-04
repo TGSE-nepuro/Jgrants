@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
-import { isRegionOption, suggestRegions } from "../shared/regions";
+import { isRegionOption, REGION_OPTIONS, suggestRegions } from "../shared/regions";
 import { buildRegionQueries, mergeGrantResults } from "../shared/grant-search-utils";
 
 function createRequestId(): string {
@@ -16,6 +16,7 @@ export function App() {
   const [regionInput, setRegionInput] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [includeNationwide, setIncludeNationwide] = useState(true);
+  const [regionOptions, setRegionOptions] = useState<string[]>([...REGION_OPTIONS]);
   const [items, setItems] = useState<GrantSummary[]>([]);
   const [detail, setDetail] = useState<GrantDetail | null>(null);
   const [favorites, setFavorites] = useState<FavoriteGrant[]>([]);
@@ -34,19 +35,33 @@ export function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const loaded = await window.jgrantsApi.listRegions(token, { requestId: createRequestId() });
+        if (loaded.length === 0) return;
+        const merged = [...new Set([...loaded, ...REGION_OPTIONS])].sort((a, b) => a.localeCompare(b, "ja"));
+        setRegionOptions(merged);
+      } catch {
+        // keep fallback region options when API region loading fails
+      }
+    })();
+  }, [token]);
+
   const selectedGrants = useMemo(
     () => items.filter((item) => selectedIds.includes(item.id)),
     [items, selectedIds]
   );
   const regionCandidates = useMemo(
-    () => suggestRegions(regionInput).filter((candidate) => !selectedRegions.includes(candidate)),
-    [regionInput, selectedRegions]
+    () => suggestRegions(regionInput, regionOptions).filter((candidate) => !selectedRegions.includes(candidate)),
+    [regionInput, selectedRegions, regionOptions]
   );
 
   function addRegion(valueRaw: string) {
     const value = valueRaw.trim();
     if (!value) return;
-    if (!isRegionOption(value)) {
+    if (!isRegionOption(value, regionOptions)) {
       setError("地域は候補から選択してください");
       return;
     }
@@ -67,13 +82,22 @@ export function App() {
     setError(null);
     setMessage(null);
 
-    if (regionInput.trim()) {
-      setError("地域は候補から選択してください");
-      return;
-    }
-
     try {
-      const regionQueries = buildRegionQueries(selectedRegions, includeNationwide);
+      const pendingRegion = regionInput.trim();
+      let effectiveRegions = selectedRegions;
+      if (pendingRegion) {
+        if (!isRegionOption(pendingRegion, regionOptions)) {
+          setError("地域は候補から選択してください");
+          return;
+        }
+        if (!effectiveRegions.includes(pendingRegion)) {
+          effectiveRegions = [...effectiveRegions, pendingRegion];
+          setSelectedRegions(effectiveRegions);
+        }
+        setRegionInput("");
+      }
+
+      const regionQueries = buildRegionQueries(effectiveRegions, includeNationwide);
       const results = await Promise.all(
         (regionQueries.length > 0
           ? regionQueries.map((region) =>
@@ -188,16 +212,16 @@ export function App() {
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
             <input
               value={regionInput}
-              list="region-options"
               placeholder="地域を追加"
               onChange={(e) => setRegionInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addRegion(regionInput);
+                }
+              }}
             />
             <button type="button" onClick={() => addRegion(regionInput)}>地域追加</button>
-            <datalist id="region-options">
-              {regionCandidates.map((candidate) => (
-                <option key={candidate} value={candidate} />
-              ))}
-            </datalist>
             <label>
               <input
                 type="checkbox"
@@ -209,6 +233,13 @@ export function App() {
             <button type="submit">検索</button>
             <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
           </form>
+          <div className="region-suggestions">
+            {regionCandidates.slice(0, 15).map((candidate) => (
+              <button key={candidate} type="button" onClick={() => addRegion(candidate)}>
+                {candidate}
+              </button>
+            ))}
+          </div>
           <div>
             {selectedRegions.map((region) => (
               <button key={region} type="button" onClick={() => removeRegion(region)}>

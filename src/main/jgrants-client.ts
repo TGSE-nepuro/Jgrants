@@ -79,6 +79,13 @@ function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
   return params;
 }
 
+function parseRegionTokens(raw: string): string[] {
+  return raw
+    .split(/[\/／,，、]/g)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function mapSummaryFromV2(item: z.infer<typeof grantSummaryV2Schema>): GrantSummary {
   return {
     id: item.id,
@@ -356,4 +363,18 @@ export async function fetchGrantDetail(
     totalDurationMs: Date.now() - startedAt
   });
   throw new Error(`Detail failed on v2(${v2.status}) and v1(${v1.status})`);
+}
+
+export async function listRegions(token: string, trace?: RequestTraceContext): Promise<string[]> {
+  const grants = await searchGrants(token, {}, trace);
+  const regions = new Set<string>();
+
+  for (const grant of grants) {
+    if (!grant.region) continue;
+    for (const tokenRegion of parseRegionTokens(grant.region)) {
+      regions.add(tokenRegion);
+    }
+  }
+
+  return [...regions].sort((a, b) => a.localeCompare(b, "ja"));
 }

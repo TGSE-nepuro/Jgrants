@@ -49,19 +49,25 @@ export const REGION_OPTIONS = [
   "沖縄県"
 ] as const;
 
-export function isRegionOption(value: string): boolean {
-  return REGION_OPTIONS.includes(value as (typeof REGION_OPTIONS)[number]);
+export function isRegionOption(value: string, options: readonly string[] = REGION_OPTIONS): boolean {
+  return options.includes(value);
 }
 
-export function suggestRegions(input: string, limit = 12): string[] {
+export function suggestRegions(
+  input: string,
+  optionsOrLimit: readonly string[] | number = REGION_OPTIONS,
+  limit = 12
+): string[] {
+  const options = Array.isArray(optionsOrLimit) ? optionsOrLimit : REGION_OPTIONS;
+  const resolvedLimit = typeof optionsOrLimit === "number" ? optionsOrLimit : limit;
   const q = input.trim();
-  if (!q) return REGION_OPTIONS.slice(0, limit);
+  if (!q) return [...options].slice(0, resolvedLimit);
 
-  const exact = REGION_OPTIONS.filter((region) => region === q);
-  const prefix = REGION_OPTIONS.filter((region) => region.startsWith(q) && region !== q);
-  const partial = REGION_OPTIONS.filter(
+  const exact = options.filter((region) => region === q);
+  const prefix = options.filter((region) => region.startsWith(q) && region !== q);
+  const partial = options.filter(
     (region) => region.includes(q) && !region.startsWith(q) && region !== q
   );
 
-  return [...exact, ...prefix, ...partial].slice(0, limit);
+  return [...exact, ...prefix, ...partial].slice(0, resolvedLimit);
 }

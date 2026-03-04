@@ -22,6 +22,7 @@ export type IpcDependencies = {
     grantId: string,
     trace?: RequestTraceContext
   ) => Promise<GrantDetail>;
+  listRegions: (token: string, trace?: RequestTraceContext) => Promise<string[]>;
   listFavorites: () => Promise<FavoriteGrant[]>;
   saveFavorite: (favorite: FavoriteGrant) => Promise<void>;
   removeFavorite: (grantId: string) => Promise<void>;
@@ -77,6 +78,12 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
       return deps.fetchGrantDetail(token, grantId, trace);
     }
   );
+
+  registrar.handle("regions:list", (_event: unknown, tokenRaw: unknown, traceRaw: unknown) => {
+    const token = z.string().min(1).parse(tokenRaw);
+    const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
+    return deps.listRegions(token, trace);
+  });
 
   registrar.handle("favorites:list", () => deps.listFavorites());
 

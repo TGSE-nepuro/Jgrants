@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { searchGrants, fetchGrantDetail } = require('../dist-electron/main/jgrants-client.js');
+const { searchGrants, fetchGrantDetail, listRegions } = require('../dist-electron/main/jgrants-client.js');
 
 const originalFetch = global.fetch;
 const originalWarn = console.warn;
@@ -237,4 +237,22 @@ test('searchGrants keeps provided requestId in completion logs', async () => {
   const completeInfo = infos.find((line) => line.message === 'jgrants search completed');
   assert.ok(completeInfo);
   assert.equal(completeInfo.meta.requestId, 'ui-trace-123');
+});
+
+test('listRegions extracts unique tokens from grant regions', async () => {
+  queueFetch([
+    {
+      status: 200,
+      body: {
+        items: [
+          { id: 'g1', title: 'A', organization: 'Org', region: '東京都/大阪府' },
+          { id: 'g2', title: 'B', organization: 'Org', region: '全国' },
+          { id: 'g3', title: 'C', organization: 'Org', region: '東京都' }
+        ]
+      }
+    }
+  ]);
+
+  const regions = await listRegions('token');
+  assert.deepEqual(regions, ['全国', '大阪府', '東京都']);
 });
