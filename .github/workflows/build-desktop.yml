@@ -42,7 +42,19 @@ jobs:
 
       - name: Run E2E smoke
         if: matrix.run_e2e
-        run: npm run e2e
+        run: npm run e2e | tee e2e-app.log
+
+      - name: Run KPI check from E2E logs
+        if: matrix.run_e2e
+        run: npm run logs:kpi:check -- e2e-app.log
+
+      - name: Upload E2E logs
+        if: matrix.run_e2e && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ matrix.os }}
+          path: e2e-app.log
+          if-no-files-found: warn
 
   package:
     name: Package (${{ matrix.os }})
