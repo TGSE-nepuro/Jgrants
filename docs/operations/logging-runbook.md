@@ -41,6 +41,8 @@
    - `npm run logs:kpi -- /path/to/app.log`
    - または `cat /path/to/app.log | npm run logs:kpi`
    - しきい値判定を含める場合: `npm run logs:kpi:check -- /path/to/app.log`
+   - しきい値上書き例:
+     `npm run logs:kpi:check -- --max-failure-rate=0.02 --max-fallback-rate=0.08 /path/to/app.log`
 4. しきい値超過時は「API応答変化」「ネットワーク」「リリース差分」の順で切り分ける
 
 ## 7. 禁止事項

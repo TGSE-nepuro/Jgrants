@@ -8,6 +8,12 @@ on:
   pull_request:
     branches: ["main"]
 
+env:
+  KPI_MAX_FAILURE_RATE: "0.01"
+  KPI_MAX_FALLBACK_RATE: "0.05"
+  KPI_MAX_SEARCH_P95_MS: "2500"
+  KPI_MAX_DETAIL_P95_MS: "1500"
+
 jobs:
   verify:
     name: Verify (${{ matrix.os }})
@@ -44,16 +50,28 @@ jobs:
         if: matrix.run_e2e
         run: npm run e2e | tee e2e-app.log
 
+      - name: Build KPI report from E2E logs
+        if: matrix.run_e2e
+        run: npm run logs:kpi -- e2e-app.log | tee e2e-kpi-report.txt
+
       - name: Run KPI check from E2E logs
         if: matrix.run_e2e
-        run: npm run logs:kpi:check -- e2e-app.log
+        run: >
+          npm run logs:kpi:check --
+          --max-failure-rate=${{ env.KPI_MAX_FAILURE_RATE }}
+          --max-fallback-rate=${{ env.KPI_MAX_FALLBACK_RATE }}
+          --max-search-p95-ms=${{ env.KPI_MAX_SEARCH_P95_MS }}
+          --max-detail-p95-ms=${{ env.KPI_MAX_DETAIL_P95_MS }}
+          e2e-app.log
 
       - name: Upload E2E logs
         if: matrix.run_e2e && always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs-${{ matrix.os }}
-          path: e2e-app.log
+          path: |
+            e2e-app.log
+            e2e-kpi-report.txt
           if-no-files-found: warn
 
   package:
