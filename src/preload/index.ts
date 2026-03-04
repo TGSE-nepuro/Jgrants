@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("jgrantsApi", {
     ipcRenderer.invoke("grants:search", token, query, trace),
   detail: (token: string, grantId: string, trace?: RequestTraceContext) =>
     ipcRenderer.invoke("grants:detail", token, grantId, trace),
+  listRegions: (token: string, trace?: RequestTraceContext) =>
+    ipcRenderer.invoke("regions:list", token, trace),
   listFavorites: () => ipcRenderer.invoke("favorites:list"),
   saveFavorite: (favorite: FavoriteGrant) => ipcRenderer.invoke("favorites:save", favorite),
   removeFavorite: (grantId: string) => ipcRenderer.invoke("favorites:remove", grantId),

@@ -17,6 +17,7 @@ declare global {
         trace?: RequestTraceContext
       ) => Promise<GrantSummary[]>;
       detail: (token: string, grantId: string, trace?: RequestTraceContext) => Promise<GrantDetail>;
+      listRegions: (token: string, trace?: RequestTraceContext) => Promise<string[]>;
       listFavorites: () => Promise<FavoriteGrant[]>;
       saveFavorite: (favorite: FavoriteGrant) => Promise<{ ok: boolean }>;
       removeFavorite: (grantId: string) => Promise<{ ok: boolean }>;
