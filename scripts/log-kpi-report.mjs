@@ -118,17 +118,78 @@ function formatPercent(value) {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function readInput(args) {
-  if (args.length > 0) {
-    return args.map((filePath) => fs.readFileSync(filePath, 'utf8')).join('\n');
+function parseArgs(argv) {
+  const options = {
+    check: false,
+    maxFailureRate: 0.01,
+    maxFallbackRate: 0.05,
+    maxSearchP95Ms: 2500,
+    maxDetailP95Ms: 1500
+  };
+  const files = [];
+
+  for (const arg of argv) {
+    if (arg === '--check') {
+      options.check = true;
+      continue;
+    }
+    if (arg.startsWith('--max-failure-rate=')) {
+      options.maxFailureRate = Number(arg.split('=')[1]);
+      continue;
+    }
+    if (arg.startsWith('--max-fallback-rate=')) {
+      options.maxFallbackRate = Number(arg.split('=')[1]);
+      continue;
+    }
+    if (arg.startsWith('--max-search-p95-ms=')) {
+      options.maxSearchP95Ms = Number(arg.split('=')[1]);
+      continue;
+    }
+    if (arg.startsWith('--max-detail-p95-ms=')) {
+      options.maxDetailP95Ms = Number(arg.split('=')[1]);
+      continue;
+    }
+    files.push(arg);
+  }
+
+  return { options, files };
+}
+
+function readInput(files) {
+  if (files.length > 0) {
+    return files.map((filePath) => fs.readFileSync(filePath, 'utf8')).join('\n');
   }
 
   const stdin = fs.readFileSync(0, 'utf8');
   return stdin;
 }
 
+export function evaluateThresholds(report, options) {
+  const violations = [];
+
+  if (report.rates.failureRate > options.maxFailureRate) {
+    violations.push(
+      `failureRate ${formatPercent(report.rates.failureRate)} > ${formatPercent(options.maxFailureRate)}`
+    );
+  }
+  if (report.rates.fallbackRate > options.maxFallbackRate) {
+    violations.push(
+      `fallbackRate ${formatPercent(report.rates.fallbackRate)} > ${formatPercent(options.maxFallbackRate)}`
+    );
+  }
+  if (report.p95.searchMs != null && report.p95.searchMs > options.maxSearchP95Ms) {
+    violations.push(`p95.searchMs ${report.p95.searchMs} > ${options.maxSearchP95Ms}`);
+  }
+  if (report.p95.detailMs != null && report.p95.detailMs > options.maxDetailP95Ms) {
+    violations.push(`p95.detailMs ${report.p95.detailMs} > ${options.maxDetailP95Ms}`);
+  }
+
+  return { ok: violations.length === 0, violations };
+}
+
 function main() {
-  const input = readInput(process.argv.slice(2));
+  const { options, files } = parseArgs(process.argv.slice(2));
+  const input = readInput(files);
   const report = computeKpiFromLogs(input);
 
   console.log(JSON.stringify(report, null, 2));
@@ -137,6 +198,17 @@ function main() {
   console.log(`fallbackRate: ${formatPercent(report.rates.fallbackRate)}`);
   console.log(`p95.searchMs: ${report.p95.searchMs ?? 'N/A'}`);
   console.log(`p95.detailMs: ${report.p95.detailMs ?? 'N/A'}`);
+
+  if (options.check) {
+    const check = evaluateThresholds(report, options);
+    if (!check.ok) {
+      for (const violation of check.violations) {
+        console.error(`[kpi:violation] ${violation}`);
+      }
+      process.exit(1);
+    }
+    console.log('[kpi] thresholds passed');
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

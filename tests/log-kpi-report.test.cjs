@@ -62,3 +62,37 @@ test('computeKpiFromLogs supports test-run prefixed lines and empty input', asyn
   assert.equal(empty.p95.searchMs, null);
   assert.equal(empty.p95.detailMs, null);
 });
+
+test('evaluateThresholds returns violations when KPI exceeds limits', async () => {
+  const { evaluateThresholds } = await loadModule();
+  const report = {
+    rates: { failureRate: 0.02, fallbackRate: 0.07 },
+    p95: { searchMs: 2600, detailMs: 1600 }
+  };
+  const result = evaluateThresholds(report, {
+    maxFailureRate: 0.01,
+    maxFallbackRate: 0.05,
+    maxSearchP95Ms: 2500,
+    maxDetailP95Ms: 1500
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.violations.length, 4);
+});
+
+test('evaluateThresholds passes when KPI is below limits', async () => {
+  const { evaluateThresholds } = await loadModule();
+  const report = {
+    rates: { failureRate: 0.002, fallbackRate: 0.01 },
+    p95: { searchMs: 700, detailMs: 500 }
+  };
+  const result = evaluateThresholds(report, {
+    maxFailureRate: 0.01,
+    maxFallbackRate: 0.05,
+    maxSearchP95Ms: 2500,
+    maxDetailP95Ms: 1500
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.violations, []);
+});
