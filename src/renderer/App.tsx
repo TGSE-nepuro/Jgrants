@@ -57,6 +57,7 @@ export function App() {
     () => suggestRegions(regionInput, regionOptions).filter((candidate) => !selectedRegions.includes(candidate)),
     [regionInput, selectedRegions, regionOptions]
   );
+  const showRegionSuggestions = regionInput.trim().length > 0 && regionCandidates.length > 0;
 
   function addRegion(valueRaw: string) {
     const value = valueRaw.trim();
@@ -71,6 +72,7 @@ export function App() {
     }
     setSelectedRegions((current) => [...current, value]);
     setRegionInput("");
+    setError(null);
   }
 
   function removeRegion(value: string) {
@@ -210,18 +212,31 @@ export function App() {
           <h2>検索</h2>
           <form onSubmit={onSearch}>
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
-            <input
-              value={regionInput}
-              placeholder="地域を追加"
-              onChange={(e) => setRegionInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addRegion(regionInput);
-                }
-              }}
-            />
-            <button type="button" onClick={() => addRegion(regionInput)}>地域追加</button>
+            <div className="region-picker">
+              <input
+                value={regionInput}
+                placeholder="地域を入力（候補から選択）"
+                onChange={(e) => setRegionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addRegion(regionInput);
+                  }
+                }}
+              />
+              <button type="button" onClick={() => addRegion(regionInput)}>地域追加</button>
+              {showRegionSuggestions && (
+                <ul className="region-suggestions" aria-label="地域候補">
+                  {regionCandidates.slice(0, 12).map((candidate) => (
+                    <li key={candidate}>
+                      <button type="button" onClick={() => addRegion(candidate)}>
+                        {candidate}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <label>
               <input
                 type="checkbox"
@@ -233,19 +248,19 @@ export function App() {
             <button type="submit">検索</button>
             <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
           </form>
-          <div className="region-suggestions">
-            {regionCandidates.slice(0, 15).map((candidate) => (
-              <button key={candidate} type="button" onClick={() => addRegion(candidate)}>
-                {candidate}
-              </button>
-            ))}
-          </div>
-          <div>
-            {selectedRegions.map((region) => (
-              <button key={region} type="button" onClick={() => removeRegion(region)}>
-                {region} ×
-              </button>
-            ))}
+          <div className="selected-regions">
+            <p>選択中の地域（×で削除）</p>
+            <div className="chips">
+              {selectedRegions.length === 0 ? (
+                <span>未選択</span>
+              ) : (
+                selectedRegions.map((region) => (
+                  <button key={region} type="button" onClick={() => removeRegion(region)}>
+                    {region} ×
+                  </button>
+                ))
+              )}
+            </div>
           </div>
           {message && <p>{message}</p>}
           {error && <p className="error">{error}</p>}

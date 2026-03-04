@@ -5,9 +5,52 @@ header { display: flex; gap: 12px; align-items: center; }
 main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
 section { background: #fff; border: 1px solid #d9e0ea; border-radius: 8px; padding: 12px; }
 .error { color: #b71c1c; }
+.region-picker {
+  position: relative;
+  display: inline-flex;
+  gap: 8px;
+}
 .region-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  padding: 6px;
+  margin: 0;
+  width: 260px;
+  max-height: 220px;
+  overflow: auto;
+  list-style: none;
+}
+.region-suggestions li {
+  margin: 0;
+  padding: 0;
+}
+.region-suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.region-suggestions button:hover {
+  background: #eef3fb;
+}
+.selected-regions {
+  margin-top: 10px;
+}
+.selected-regions p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #3c4757;
+}
+.chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
 }
