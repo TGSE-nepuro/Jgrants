@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
+import { isRegionOption, suggestRegions } from "../shared/regions";
 
 function createRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -34,13 +35,25 @@ export function App() {
     () => items.filter((item) => selectedIds.includes(item.id)),
     [items, selectedIds]
   );
+  const regionCandidates = useMemo(() => suggestRegions(region), [region]);
 
   async function onSearch(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setMessage(null);
+
+    const normalizedRegion = region.trim();
+    if (normalizedRegion && !isRegionOption(normalizedRegion)) {
+      setError("地域は候補から選択してください");
+      return;
+    }
+
     try {
-      const result = await window.jgrantsApi.search(token, { keyword, region }, { requestId: createRequestId() });
+      const result = await window.jgrantsApi.search(
+        token,
+        { keyword, region: normalizedRegion },
+        { requestId: createRequestId() }
+      );
       setItems(result);
       setSelectedIds([]);
     } catch (e) {
@@ -146,7 +159,17 @@ export function App() {
           <h2>検索</h2>
           <form onSubmit={onSearch}>
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
-            <input value={region} placeholder="地域" onChange={(e) => setRegion(e.target.value)} />
+            <input
+              value={region}
+              list="region-options"
+              placeholder="地域（候補から選択）"
+              onChange={(e) => setRegion(e.target.value)}
+            />
+            <datalist id="region-options">
+              {regionCandidates.map((candidate) => (
+                <option key={candidate} value={candidate} />
+              ))}
+            </datalist>
             <button type="submit">検索</button>
             <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
           </form>
