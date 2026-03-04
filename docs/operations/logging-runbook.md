@@ -45,6 +45,13 @@
      `npm run logs:kpi:check -- --max-failure-rate=0.02 --max-fallback-rate=0.08 /path/to/app.log`
 4. しきい値超過時は「API応答変化」「ネットワーク」「リリース差分」の順で切り分ける
 
-## 7. 禁止事項
+## 7. KPIしきい値チューニング手順
+1. 直近1-2週間の `e2e-kpi-report.txt` と本番/検証ログを収集する
+2. 日次の実測値から `failureRate`, `fallbackRate`, `p95.searchMs`, `p95.detailMs` の分布を確認する
+3. 分布の95-99パーセンタイルを基準に、`KPI_MAX_*` を「通常時に落ちないが異常時に検知できる値」へ調整する
+4. 設定値は `.github/workflows/build-desktop.yml` の workflow `env` に反映し、PRでレビューする
+5. 変更後1週間は誤検知率を確認し、必要なら再調整する
+
+## 8. 禁止事項
 - 生トークンや生メールアドレスをログへ手動出力しない
 - 開発時でも `console.log` へ機微情報を直接出力しない
