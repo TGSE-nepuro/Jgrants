@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
 import { isRegionOption, suggestRegions } from "../shared/regions";
+import { buildRegionQueries, mergeGrantResults } from "../shared/grant-search-utils";
 
 function createRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -12,7 +13,9 @@ function createRequestId(): string {
 export function App() {
   const [token, setToken] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [region, setRegion] = useState("");
+  const [regionInput, setRegionInput] = useState("");
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [includeNationwide, setIncludeNationwide] = useState(true);
   const [items, setItems] = useState<GrantSummary[]>([]);
   const [detail, setDetail] = useState<GrantDetail | null>(null);
   const [favorites, setFavorites] = useState<FavoriteGrant[]>([]);
@@ -35,26 +38,50 @@ export function App() {
     () => items.filter((item) => selectedIds.includes(item.id)),
     [items, selectedIds]
   );
-  const regionCandidates = useMemo(() => suggestRegions(region), [region]);
+  const regionCandidates = useMemo(
+    () => suggestRegions(regionInput).filter((candidate) => !selectedRegions.includes(candidate)),
+    [regionInput, selectedRegions]
+  );
+
+  function addRegion(valueRaw: string) {
+    const value = valueRaw.trim();
+    if (!value) return;
+    if (!isRegionOption(value)) {
+      setError("地域は候補から選択してください");
+      return;
+    }
+    if (selectedRegions.includes(value)) {
+      setRegionInput("");
+      return;
+    }
+    setSelectedRegions((current) => [...current, value]);
+    setRegionInput("");
+  }
+
+  function removeRegion(value: string) {
+    setSelectedRegions((current) => current.filter((region) => region !== value));
+  }
 
   async function onSearch(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setMessage(null);
 
-    const normalizedRegion = region.trim();
-    if (normalizedRegion && !isRegionOption(normalizedRegion)) {
+    if (regionInput.trim()) {
       setError("地域は候補から選択してください");
       return;
     }
 
     try {
-      const result = await window.jgrantsApi.search(
-        token,
-        { keyword, region: normalizedRegion },
-        { requestId: createRequestId() }
+      const regionQueries = buildRegionQueries(selectedRegions, includeNationwide);
+      const results = await Promise.all(
+        (regionQueries.length > 0
+          ? regionQueries.map((region) =>
+              window.jgrantsApi.search(token, { keyword, region }, { requestId: createRequestId() })
+            )
+          : [window.jgrantsApi.search(token, { keyword }, { requestId: createRequestId() })])
       );
-      setItems(result);
+      setItems(mergeGrantResults(results));
       setSelectedIds([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "検索失敗");
@@ -160,19 +187,35 @@ export function App() {
           <form onSubmit={onSearch}>
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
             <input
-              value={region}
+              value={regionInput}
               list="region-options"
-              placeholder="地域（候補から選択）"
-              onChange={(e) => setRegion(e.target.value)}
+              placeholder="地域を追加"
+              onChange={(e) => setRegionInput(e.target.value)}
             />
+            <button type="button" onClick={() => addRegion(regionInput)}>地域追加</button>
             <datalist id="region-options">
               {regionCandidates.map((candidate) => (
                 <option key={candidate} value={candidate} />
               ))}
             </datalist>
+            <label>
+              <input
+                type="checkbox"
+                checked={includeNationwide}
+                onChange={(e) => setIncludeNationwide(e.target.checked)}
+              />
+              全国案件を含める
+            </label>
             <button type="submit">検索</button>
             <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
           </form>
+          <div>
+            {selectedRegions.map((region) => (
+              <button key={region} type="button" onClick={() => removeRegion(region)}>
+                {region} ×
+              </button>
+            ))}
+          </div>
           {message && <p>{message}</p>}
           {error && <p className="error">{error}</p>}
           <ul>
@@ -184,6 +227,7 @@ export function App() {
                   onChange={() => toggleSelection(item.id)}
                 />
                 <button onClick={() => void openDetail(item)}>{item.title}</button>
+                {item.region && <span>{item.region}</span>}
                 <button onClick={() => void addFavorite(item)}>保存</button>
               </li>
             ))}
