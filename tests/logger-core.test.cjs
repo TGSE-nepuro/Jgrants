@@ -45,3 +45,16 @@ test('buildLogEntry produces json string with masked meta', () => {
   assert.equal(parsed.meta.note, 'email [REDACTED_EMAIL]');
   assert.ok(parsed.timestamp);
 });
+
+test('buildLogEntry keeps observability fields while masking sensitive data', () => {
+  const line = buildLogEntry('info', 'jgrants search completed', {
+    requestId: 'req-123',
+    durationMs: 42,
+    authorization: 'Bearer abc.def.ghi'
+  });
+
+  const parsed = JSON.parse(line);
+  assert.equal(parsed.meta.requestId, 'req-123');
+  assert.equal(parsed.meta.durationMs, 42);
+  assert.equal(parsed.meta.authorization, '[REDACTED]');
+});

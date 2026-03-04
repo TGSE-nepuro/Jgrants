@@ -6,6 +6,11 @@
 ## 2. ログ仕様
 - 出力形式: JSON 1行
 - 共通キー: `timestamp`, `level`, `message`, `meta`
+- API呼び出し観測キー:
+  - `meta.requestId`: 1リクエスト単位の相関ID（v2->v1フォールバック時も同一値）
+  - `meta.durationMs`: 各API呼び出しの所要時間（ミリ秒）
+  - `meta.apiVersion`: `v1` or `v2`
+  - `meta.operation`: `search` or `detail`（失敗ログ）
 - マスキング対象:
   - キー名に `token`, `authorization`, `password`, `secret`, `apiKey` を含む値
   - Bearerトークン形式文字列
@@ -14,7 +19,7 @@
 ## 3. 収集手順
 1. アプリ実行時の標準出力/標準エラーを収集
 2. `level=error` を優先的に抽出
-3. `message` と `meta` から失敗API・ステータス・実行条件を確認
+3. `message` と `meta` から失敗API・ステータス・`requestId`・`durationMs` を確認
 
 ## 4. 障害時の一次対応
 1. `uncaughtException` / `unhandledRejection` の直近ログを確認

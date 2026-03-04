@@ -4,6 +4,22 @@ const assert = require('node:assert/strict');
 const { searchGrants, fetchGrantDetail } = require('../dist-electron/main/jgrants-client.js');
 
 const originalFetch = global.fetch;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+function captureConsoleJson(method) {
+  const lines = [];
+  console[method] = (...args) => {
+    const first = args[0];
+    if (typeof first !== 'string') return;
+    try {
+      lines.push(JSON.parse(first));
+    } catch {
+      // ignore non-json logs
+    }
+  };
+  return lines;
+}
 
 function mockResponse(status, body, jsonReject = false) {
   return {
@@ -28,6 +44,8 @@ function queueFetch(responses) {
 
 test.afterEach(() => {
   global.fetch = originalFetch;
+  console.warn = originalWarn;
+  console.error = originalError;
 });
 
 test('searchGrants falls back from v2 to v1 when v2 is unsupported', async () => {
@@ -173,4 +191,37 @@ test('fetchGrantDetail throws combined error when both versions fail', async () 
 test('fetchGrantDetail handles invalid json response as missing payload', async () => {
   queueFetch([{ status: 200, body: null, jsonReject: true }]);
   await assert.rejects(() => fetchGrantDetail('token', 'x3'), /Invalid v2 detail payload/);
+});
+
+test('search fallback warning includes requestId and timing fields', async () => {
+  const warnings = captureConsoleJson('warn');
+  queueFetch([
+    { status: 404, body: { error: 'v2 unsupported' } },
+    { status: 200, body: { items: [{ subsidy_id: 's-3', name: '補助金C', ministry: '省庁C' }] } }
+  ]);
+
+  await searchGrants('token', { keyword: 'fallback' });
+
+  const fallbackWarn = warnings.find((line) => line.message === 'Fallback to v1 for search');
+  assert.ok(fallbackWarn);
+  assert.equal(fallbackWarn.meta.fromVersion, 'v2');
+  assert.equal(fallbackWarn.meta.toVersion, 'v1');
+  assert.equal(typeof fallbackWarn.meta.requestId, 'string');
+  assert.ok(fallbackWarn.meta.requestId.length > 0);
+  assert.equal(typeof fallbackWarn.meta.durationMs, 'number');
+});
+
+test('requestJson network errors are logged with request context', async () => {
+  const errors = captureConsoleJson('error');
+  queueFetch([{ throwError: new Error('network down hard') }]);
+
+  await assert.rejects(() => searchGrants('token', { keyword: 'network' }), /network down hard/);
+
+  const errorLine = errors.find((line) => line.message === 'jgrants request failed');
+  assert.ok(errorLine);
+  assert.equal(errorLine.meta.operation, 'search');
+  assert.equal(errorLine.meta.apiVersion, 'v2');
+  assert.equal(typeof errorLine.meta.requestId, 'string');
+  assert.equal(typeof errorLine.meta.durationMs, 'number');
+  assert.equal(errorLine.meta.error, 'network down hard');
 });
