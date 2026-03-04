@@ -17,8 +17,9 @@
     "e2e:ci": "xvfb-run -a npm run e2e",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs tests/logger-core.test.cjs tests/release-preflight.test.cjs",
-    "release:preflight": "node scripts/release-preflight.mjs"
+    "test": "npm run build:main && node --test tests/csv-core.test.cjs tests/favorites-store-core.test.cjs tests/ipc-handlers.test.cjs tests/jgrants-client.test.cjs tests/token-store-core.test.cjs tests/logger-core.test.cjs tests/release-preflight.test.cjs tests/log-kpi-report.test.cjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "logs:kpi": "node scripts/log-kpi-report.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
