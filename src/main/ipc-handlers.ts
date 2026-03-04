@@ -1,13 +1,27 @@
 import { z } from "zod";
-import { FavoriteGrant, GrantDetail, GrantSearchQuery, GrantSummary } from "../shared/types";
+import {
+  FavoriteGrant,
+  GrantDetail,
+  GrantSearchQuery,
+  GrantSummary,
+  RequestTraceContext
+} from "../shared/types";
 
 export type IpcRegistrar = {
   handle: (channel: string, listener: (...args: any[]) => unknown) => void;
 };
 
 export type IpcDependencies = {
-  searchGrants: (token: string, query: GrantSearchQuery) => Promise<GrantSummary[]>;
-  fetchGrantDetail: (token: string, grantId: string) => Promise<GrantDetail>;
+  searchGrants: (
+    token: string,
+    query: GrantSearchQuery,
+    trace?: RequestTraceContext
+  ) => Promise<GrantSummary[]>;
+  fetchGrantDetail: (
+    token: string,
+    grantId: string,
+    trace?: RequestTraceContext
+  ) => Promise<GrantDetail>;
   listFavorites: () => Promise<FavoriteGrant[]>;
   saveFavorite: (favorite: FavoriteGrant) => Promise<void>;
   removeFavorite: (grantId: string) => Promise<void>;
@@ -39,18 +53,30 @@ const grantSummarySchema = z.object({
   region: z.string().optional()
 });
 
-export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependencies): void {
-  registrar.handle("grants:search", (_event: unknown, tokenRaw: unknown, queryRaw: unknown) => {
-    const token = z.string().min(1).parse(tokenRaw);
-    const query = searchQuerySchema.parse(queryRaw);
-    return deps.searchGrants(token, query);
-  });
+const requestTraceSchema = z.object({
+  requestId: z.string().min(1).optional()
+});
 
-  registrar.handle("grants:detail", (_event: unknown, tokenRaw: unknown, grantIdRaw: unknown) => {
-    const token = z.string().min(1).parse(tokenRaw);
-    const grantId = z.string().min(1).parse(grantIdRaw);
-    return deps.fetchGrantDetail(token, grantId);
-  });
+export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependencies): void {
+  registrar.handle(
+    "grants:search",
+    (_event: unknown, tokenRaw: unknown, queryRaw: unknown, traceRaw: unknown) => {
+      const token = z.string().min(1).parse(tokenRaw);
+      const query = searchQuerySchema.parse(queryRaw);
+      const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
+      return deps.searchGrants(token, query, trace);
+    }
+  );
+
+  registrar.handle(
+    "grants:detail",
+    (_event: unknown, tokenRaw: unknown, grantIdRaw: unknown, traceRaw: unknown) => {
+      const token = z.string().min(1).parse(tokenRaw);
+      const grantId = z.string().min(1).parse(grantIdRaw);
+      const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
+      return deps.fetchGrantDetail(token, grantId, trace);
+    }
+  );
 
   registrar.handle("favorites:list", () => deps.listFavorites());
 

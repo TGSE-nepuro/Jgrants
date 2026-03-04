@@ -26,3 +26,7 @@ export type FavoriteGrant = {
   organization: string;
   savedAt: string;
 };
+
+export type RequestTraceContext = {
+  requestId?: string;
+};

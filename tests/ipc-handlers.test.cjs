@@ -51,17 +51,18 @@ test('grants:search validates and forwards token/query', async () => {
   const { handlers, registrar } = createRegistrar();
   const calls = [];
   registerIpcHandlers(registrar, createDeps({
-    searchGrants: async (token, query) => {
-      calls.push({ token, query });
+    searchGrants: async (token, query, trace) => {
+      calls.push({ token, query, trace });
       return [{ id: 'g1', title: '補助金', organization: '機関' }];
     }
   }));
 
-  const ok = await handlers.get('grants:search')({}, 'token', { keyword: 'DX' });
+  const ok = await handlers.get('grants:search')({}, 'token', { keyword: 'DX' }, { requestId: 'req-1' });
   assert.equal(ok.length, 1);
-  assert.deepEqual(calls, [{ token: 'token', query: { keyword: 'DX' } }]);
+  assert.deepEqual(calls, [{ token: 'token', query: { keyword: 'DX' }, trace: { requestId: 'req-1' } }]);
 
   assert.throws(() => handlers.get('grants:search')({}, '', { keyword: 'DX' }));
+  assert.throws(() => handlers.get('grants:search')({}, 'token', { keyword: 'DX' }, { requestId: '' }));
 });
 
 test('favorites handlers validate payload and call dependencies', async () => {

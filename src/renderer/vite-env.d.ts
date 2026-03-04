@@ -1,12 +1,22 @@
 /// <reference types="vite/client" />
 
-import { FavoriteGrant, GrantDetail, GrantSearchQuery, GrantSummary } from "../shared/types";
+import {
+  FavoriteGrant,
+  GrantDetail,
+  GrantSearchQuery,
+  GrantSummary,
+  RequestTraceContext
+} from "../shared/types";
 
 declare global {
   interface Window {
     jgrantsApi: {
-      search: (token: string, query: GrantSearchQuery) => Promise<GrantSummary[]>;
-      detail: (token: string, grantId: string) => Promise<GrantDetail>;
+      search: (
+        token: string,
+        query: GrantSearchQuery,
+        trace?: RequestTraceContext
+      ) => Promise<GrantSummary[]>;
+      detail: (token: string, grantId: string, trace?: RequestTraceContext) => Promise<GrantDetail>;
       listFavorites: () => Promise<FavoriteGrant[]>;
       saveFavorite: (favorite: FavoriteGrant) => Promise<{ ok: boolean }>;
       removeFavorite: (grantId: string) => Promise<{ ok: boolean }>;

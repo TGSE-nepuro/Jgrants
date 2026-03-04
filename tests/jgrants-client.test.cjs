@@ -6,6 +6,7 @@ const { searchGrants, fetchGrantDetail } = require('../dist-electron/main/jgrant
 const originalFetch = global.fetch;
 const originalWarn = console.warn;
 const originalError = console.error;
+const originalLog = console.log;
 
 function captureConsoleJson(method) {
   const lines = [];
@@ -46,6 +47,7 @@ test.afterEach(() => {
   global.fetch = originalFetch;
   console.warn = originalWarn;
   console.error = originalError;
+  console.log = originalLog;
 });
 
 test('searchGrants falls back from v2 to v1 when v2 is unsupported', async () => {
@@ -224,4 +226,15 @@ test('requestJson network errors are logged with request context', async () => {
   assert.equal(typeof errorLine.meta.requestId, 'string');
   assert.equal(typeof errorLine.meta.durationMs, 'number');
   assert.equal(errorLine.meta.error, 'network down hard');
+});
+
+test('searchGrants keeps provided requestId in completion logs', async () => {
+  const infos = captureConsoleJson('log');
+  queueFetch([{ status: 200, body: { items: [{ id: 'g1', title: '補助金', organization: '機関' }] } }]);
+
+  await searchGrants('token', { keyword: 'trace' }, { requestId: 'ui-trace-123' });
+
+  const completeInfo = infos.find((line) => line.message === 'jgrants search completed');
+  assert.ok(completeInfo);
+  assert.equal(completeInfo.meta.requestId, 'ui-trace-123');
 });
