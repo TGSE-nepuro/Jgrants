@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { GrantDetail, GrantSearchQuery, GrantSummary } from "../shared/types";
-import { logWarn } from "./logger";
+import { logError, logInfo, logWarn } from "./logger";
 
 const V2_BASE_URL = "https://api.jgrants-portal.go.jp/v2";
 const V1_BASE_URL = "https://api.jgrants-portal.go.jp/v1";
@@ -176,54 +176,176 @@ function shouldFallback(status: number): boolean {
   return status === 404 || status === 410 || status === 422 || status === 501;
 }
 
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
 async function requestJson(
   token: string,
   baseUrl: string,
   path: string,
+  context: { requestId: string; operation: "search" | "detail"; apiVersion: "v1" | "v2" },
   query?: URLSearchParams
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; durationMs: number }> {
   const url = `${baseUrl}${path}${query ? `?${query.toString()}` : ""}`;
-  const response = await fetch(url, { headers: authHeader(token) });
-  const body = await response.json().catch(() => null);
-  return { status: response.status, body };
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(url, { headers: authHeader(token) });
+    const body = await response.json().catch(() => null);
+    return { status: response.status, body, durationMs: Date.now() - startedAt };
+  } catch (error) {
+    logError("jgrants request failed", {
+      requestId: context.requestId,
+      operation: context.operation,
+      endpoint: path,
+      apiVersion: context.apiVersion,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
 }
 
 export async function searchGrants(token: string, query: GrantSearchQuery): Promise<GrantSummary[]> {
+  const requestId = createRequestId();
+  const startedAt = Date.now();
   const params = buildSearchParams(query);
-  const v2 = await requestJson(token, V2_BASE_URL, "/subsidies", params);
+  const v2 = await requestJson(
+    token,
+    V2_BASE_URL,
+    "/subsidies",
+    { requestId, operation: "search", apiVersion: "v2" },
+    params
+  );
 
   if (v2.status >= 200 && v2.status < 300) {
-    return parseSearchV2(v2.body);
+    const grants = parseSearchV2(v2.body);
+    logInfo("jgrants search completed", {
+      requestId,
+      apiVersion: "v2",
+      status: v2.status,
+      resultCount: grants.length,
+      durationMs: Date.now() - startedAt
+    });
+    return grants;
   }
 
   if (!shouldFallback(v2.status)) {
+    logWarn("jgrants search failed without fallback", {
+      requestId,
+      endpoint: "/subsidies",
+      apiVersion: "v2",
+      status: v2.status,
+      durationMs: v2.durationMs
+    });
     throw new Error(`Search failed on v2: ${v2.status}`);
   }
 
-  logWarn("Fallback to v1 for search", { endpoint: "/subsidies", status: v2.status, query });
-  const v1 = await requestJson(token, V1_BASE_URL, "/subsidies", params);
+  logWarn("Fallback to v1 for search", {
+    requestId,
+    endpoint: "/subsidies",
+    fromVersion: "v2",
+    toVersion: "v1",
+    status: v2.status,
+    durationMs: v2.durationMs,
+    query
+  });
+  const v1 = await requestJson(
+    token,
+    V1_BASE_URL,
+    "/subsidies",
+    { requestId, operation: "search", apiVersion: "v1" },
+    params
+  );
   if (v1.status >= 200 && v1.status < 300) {
-    return parseSearchV1(v1.body);
+    const grants = parseSearchV1(v1.body);
+    logInfo("jgrants search completed", {
+      requestId,
+      apiVersion: "v1",
+      status: v1.status,
+      resultCount: grants.length,
+      durationMs: Date.now() - startedAt
+    });
+    return grants;
   }
 
+  logWarn("jgrants search failed after fallback", {
+    requestId,
+    v2Status: v2.status,
+    v1Status: v1.status,
+    totalDurationMs: Date.now() - startedAt
+  });
   throw new Error(`Search failed on v2(${v2.status}) and v1(${v1.status})`);
 }
 
 export async function fetchGrantDetail(token: string, grantId: string): Promise<GrantDetail> {
-  const v2 = await requestJson(token, V2_BASE_URL, `/subsidies/${grantId}`);
+  const requestId = createRequestId();
+  const startedAt = Date.now();
+  const endpoint = `/subsidies/${grantId}`;
+  const v2 = await requestJson(
+    token,
+    V2_BASE_URL,
+    endpoint,
+    { requestId, operation: "detail", apiVersion: "v2" }
+  );
   if (v2.status >= 200 && v2.status < 300) {
-    return parseDetailV2(v2.body);
+    const detail = parseDetailV2(v2.body);
+    logInfo("jgrants detail completed", {
+      requestId,
+      grantId,
+      apiVersion: "v2",
+      status: v2.status,
+      durationMs: Date.now() - startedAt
+    });
+    return detail;
   }
 
   if (!shouldFallback(v2.status)) {
+    logWarn("jgrants detail failed without fallback", {
+      requestId,
+      endpoint,
+      apiVersion: "v2",
+      status: v2.status,
+      durationMs: v2.durationMs
+    });
     throw new Error(`Detail failed on v2: ${v2.status}`);
   }
 
-  logWarn("Fallback to v1 for detail", { endpoint: `/subsidies/${grantId}`, status: v2.status });
-  const v1 = await requestJson(token, V1_BASE_URL, `/subsidies/${grantId}`);
+  logWarn("Fallback to v1 for detail", {
+    requestId,
+    endpoint,
+    fromVersion: "v2",
+    toVersion: "v1",
+    status: v2.status,
+    durationMs: v2.durationMs
+  });
+  const v1 = await requestJson(token, V1_BASE_URL, endpoint, {
+    requestId,
+    operation: "detail",
+    apiVersion: "v1"
+  });
   if (v1.status >= 200 && v1.status < 300) {
-    return parseDetailV1(v1.body);
+    const detail = parseDetailV1(v1.body);
+    logInfo("jgrants detail completed", {
+      requestId,
+      grantId,
+      apiVersion: "v1",
+      status: v1.status,
+      durationMs: Date.now() - startedAt
+    });
+    return detail;
   }
 
+  logWarn("jgrants detail failed after fallback", {
+    requestId,
+    grantId,
+    v2Status: v2.status,
+    v1Status: v1.status,
+    totalDurationMs: Date.now() - startedAt
+  });
   throw new Error(`Detail failed on v2(${v2.status}) and v1(${v1.status})`);
 }
