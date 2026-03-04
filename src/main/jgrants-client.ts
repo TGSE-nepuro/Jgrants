@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GrantDetail, GrantSearchQuery, GrantSummary } from "../shared/types";
+import { GrantDetail, GrantSearchQuery, GrantSummary, RequestTraceContext } from "../shared/types";
 import { logError, logInfo, logWarn } from "./logger";
 
 const V2_BASE_URL = "https://api.jgrants-portal.go.jp/v2";
@@ -210,8 +210,12 @@ async function requestJson(
   }
 }
 
-export async function searchGrants(token: string, query: GrantSearchQuery): Promise<GrantSummary[]> {
-  const requestId = createRequestId();
+export async function searchGrants(
+  token: string,
+  query: GrantSearchQuery,
+  trace?: RequestTraceContext
+): Promise<GrantSummary[]> {
+  const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
   const params = buildSearchParams(query);
   const v2 = await requestJson(
@@ -282,8 +286,12 @@ export async function searchGrants(token: string, query: GrantSearchQuery): Prom
   throw new Error(`Search failed on v2(${v2.status}) and v1(${v1.status})`);
 }
 
-export async function fetchGrantDetail(token: string, grantId: string): Promise<GrantDetail> {
-  const requestId = createRequestId();
+export async function fetchGrantDetail(
+  token: string,
+  grantId: string,
+  trace?: RequestTraceContext
+): Promise<GrantDetail> {
+  const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
   const endpoint = `/subsidies/${grantId}`;
   const v2 = await requestJson(

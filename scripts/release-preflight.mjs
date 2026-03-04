@@ -1,4 +1,6 @@
 import process from 'node:process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function isTagRef(ref) {
   return typeof ref === 'string' && ref.startsWith('refs/tags/');
@@ -6,6 +8,16 @@ function isTagRef(ref) {
 
 function isSemverTag(tagName) {
   return /^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tagName);
+}
+
+function loadPackageVersion(cwd) {
+  try {
+    const packageJsonPath = path.join(cwd, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    return typeof packageJson.version === 'string' ? packageJson.version : null;
+  } catch {
+    return null;
+  }
 }
 
 export function validateReleaseContext(env) {
@@ -19,6 +31,13 @@ export function validateReleaseContext(env) {
     const tagName = githubRef.replace('refs/tags/', '');
     if (!isSemverTag(tagName)) {
       errors.push(`Tag format is invalid: ${tagName}. Expected vX.Y.Z`);
+    } else {
+      const packageVersion = env.PACKAGE_VERSION_OVERRIDE || loadPackageVersion(env.GITHUB_WORKSPACE || process.cwd());
+      if (!packageVersion) {
+        warnings.push('package.json version is not available. Tag/version consistency check was skipped.');
+      } else if (tagName !== `v${packageVersion}`) {
+        errors.push(`Tag/version mismatch: tag=${tagName}, package.json=${packageVersion}`);
+      }
     }
   }
 

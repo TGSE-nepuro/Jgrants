@@ -1,6 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
 
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `ui-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
 export function App() {
   const [token, setToken] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -33,7 +40,7 @@ export function App() {
     setError(null);
     setMessage(null);
     try {
-      const result = await window.jgrantsApi.search(token, { keyword, region });
+      const result = await window.jgrantsApi.search(token, { keyword, region }, { requestId: createRequestId() });
       setItems(result);
       setSelectedIds([]);
     } catch (e) {
@@ -45,7 +52,7 @@ export function App() {
     setError(null);
     setMessage(null);
     try {
-      setDetail(await window.jgrantsApi.detail(token, item.id));
+      setDetail(await window.jgrantsApi.detail(token, item.id, { requestId: createRequestId() }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "詳細取得失敗");
     }

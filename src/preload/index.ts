@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { FavoriteGrant, GrantSearchQuery, GrantSummary } from "../shared/types";
+import { FavoriteGrant, GrantSearchQuery, GrantSummary, RequestTraceContext } from "../shared/types";
 
 contextBridge.exposeInMainWorld("jgrantsApi", {
-  search: (token: string, query: GrantSearchQuery) => ipcRenderer.invoke("grants:search", token, query),
-  detail: (token: string, grantId: string) => ipcRenderer.invoke("grants:detail", token, grantId),
+  search: (token: string, query: GrantSearchQuery, trace?: RequestTraceContext) =>
+    ipcRenderer.invoke("grants:search", token, query, trace),
+  detail: (token: string, grantId: string, trace?: RequestTraceContext) =>
+    ipcRenderer.invoke("grants:detail", token, grantId, trace),
   listFavorites: () => ipcRenderer.invoke("favorites:list"),
   saveFavorite: (favorite: FavoriteGrant) => ipcRenderer.invoke("favorites:save", favorite),
   removeFavorite: (grantId: string) => ipcRenderer.invoke("favorites:remove", grantId),

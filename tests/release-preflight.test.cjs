@@ -11,8 +11,9 @@ async function loadModule() {
 test('preflight passes with valid semver tag and full signing env', async () => {
   const { validateReleaseContext } = await loadModule();
   const result = validateReleaseContext({
-    GITHUB_REF: 'refs/tags/v1.2.3',
+    GITHUB_REF: 'refs/tags/v0.1.0',
     RELEASE_SIGNING_REQUIRED: 'true',
+    PACKAGE_VERSION_OVERRIDE: '0.1.0',
     CSC_LINK: 'x',
     CSC_KEY_PASSWORD: 'x',
     APPLE_ID: 'x',
@@ -26,7 +27,8 @@ test('preflight passes with valid semver tag and full signing env', async () => 
 test('preflight fails when signing required but secrets are missing', async () => {
   const { validateReleaseContext } = await loadModule();
   const result = validateReleaseContext({
-    GITHUB_REF: 'refs/tags/v1.2.3',
+    GITHUB_REF: 'refs/tags/v0.1.0',
+    PACKAGE_VERSION_OVERRIDE: '0.1.0',
     RELEASE_SIGNING_REQUIRED: 'true',
     CSC_LINK: 'x'
   });
@@ -44,4 +46,16 @@ test('preflight fails on invalid tag format', async () => {
 
   assert.equal(result.errors.length, 1);
   assert.match(result.errors[0], /Tag format is invalid/);
+});
+
+test('preflight fails when tag and package version mismatch', async () => {
+  const { validateReleaseContext } = await loadModule();
+  const result = validateReleaseContext({
+    GITHUB_REF: 'refs/tags/v0.2.0',
+    RELEASE_SIGNING_REQUIRED: 'false',
+    PACKAGE_VERSION_OVERRIDE: '0.1.0'
+  });
+
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /Tag\/version mismatch/);
 });
