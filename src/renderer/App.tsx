@@ -31,6 +31,7 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasToken = token.trim().length > 0;
 
   useEffect(() => {
     void (async () => {
@@ -232,9 +233,16 @@ export function App() {
         <button onClick={() => void saveToken()}>トークン保存</button>
         <button onClick={() => void clearToken()}>トークン削除</button>
       </header>
+      <div className="token-guide">
+        <span className={`token-state ${hasToken ? "ok" : "warn"}`}>
+          {hasToken ? "APIトークン設定済み" : "APIトークン未設定"}
+        </span>
+        <span>トークン不要: お気に入り閲覧/削除・CSV出力・地域選択編集</span>
+        <span>トークン必須: 補助金検索・詳細取得・API地域候補更新</span>
+      </div>
       <main>
         <section>
-          <h2>検索</h2>
+          <h2>検索 <span className="badge required">要トークン</span></h2>
           <form onSubmit={onSearch}>
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
             <div className="region-picker">
@@ -270,8 +278,16 @@ export function App() {
               />
               全国案件を含める
             </label>
-            <button type="submit">検索</button>
-            <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
+            <button
+              type="submit"
+              disabled={!hasToken}
+              title={!hasToken ? "APIトークン設定後に利用できます" : undefined}
+            >
+              検索
+            </button>
+            <button type="button" onClick={() => void exportCsv()}>
+              比較CSV出力 <span className="badge optional">トークン不要</span>
+            </button>
           </form>
           <div className="selected-regions">
             <p>選択中の地域（×で削除）</p>
@@ -297,7 +313,13 @@ export function App() {
                   checked={selectedIds.includes(item.id)}
                   onChange={() => toggleSelection(item.id)}
                 />
-                <button onClick={() => void openDetail(item)}>{item.title}</button>
+                <button
+                  onClick={() => void openDetail(item)}
+                  disabled={!hasToken}
+                  title={!hasToken ? "APIトークン設定後に利用できます" : undefined}
+                >
+                  {item.title}
+                </button>
                 {item.region && <span>{item.region}</span>}
                 <button onClick={() => void addFavorite(item)}>保存</button>
               </li>
@@ -305,7 +327,7 @@ export function App() {
           </ul>
         </section>
         <section>
-          <h2>詳細</h2>
+          <h2>詳細 <span className="badge required">要トークン</span></h2>
           {detail ? (
             <article>
               <h3>{detail.title}</h3>
@@ -317,7 +339,7 @@ export function App() {
           )}
         </section>
         <section>
-          <h2>お気に入り</h2>
+          <h2>お気に入り <span className="badge optional">トークン不要</span></h2>
           <ul>
             {favorites.map((f) => (
               <li key={f.id}>
