@@ -10,6 +10,14 @@ function createRequestId(): string {
   return `ui-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
+function toUserError(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) return fallback;
+  if (error.message.includes("String must contain at least 1 character")) {
+    return "APIトークンを入力してください";
+  }
+  return error.message;
+}
+
 export function App() {
   const [token, setToken] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -36,10 +44,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    const normalizedToken = token.trim();
+    if (!normalizedToken) return;
     void (async () => {
       try {
-        const loaded = await window.jgrantsApi.listRegions(token, { requestId: createRequestId() });
+        const loaded = await window.jgrantsApi.listRegions(normalizedToken, { requestId: createRequestId() });
         if (loaded.length === 0) return;
         const merged = [...new Set([...loaded, ...REGION_OPTIONS])].sort((a, b) => a.localeCompare(b, "ja"));
         setRegionOptions(merged);
@@ -83,6 +92,11 @@ export function App() {
     event.preventDefault();
     setError(null);
     setMessage(null);
+    const normalizedToken = token.trim();
+    if (!normalizedToken) {
+      setError("APIトークンを入力してください");
+      return;
+    }
 
     try {
       const pendingRegion = regionInput.trim();
@@ -103,24 +117,29 @@ export function App() {
       const results = await Promise.all(
         (regionQueries.length > 0
           ? regionQueries.map((region) =>
-              window.jgrantsApi.search(token, { keyword, region }, { requestId: createRequestId() })
+              window.jgrantsApi.search(normalizedToken, { keyword, region }, { requestId: createRequestId() })
             )
-          : [window.jgrantsApi.search(token, { keyword }, { requestId: createRequestId() })])
+          : [window.jgrantsApi.search(normalizedToken, { keyword }, { requestId: createRequestId() })])
       );
       setItems(mergeGrantResults(results));
       setSelectedIds([]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "検索失敗");
+      setError(toUserError(e, "検索失敗"));
     }
   }
 
   async function openDetail(item: GrantSummary) {
     setError(null);
     setMessage(null);
+    const normalizedToken = token.trim();
+    if (!normalizedToken) {
+      setError("APIトークンを入力してください");
+      return;
+    }
     try {
-      setDetail(await window.jgrantsApi.detail(token, item.id, { requestId: createRequestId() }));
+      setDetail(await window.jgrantsApi.detail(normalizedToken, item.id, { requestId: createRequestId() }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "詳細取得失敗");
+      setError(toUserError(e, "詳細取得失敗"));
     }
   }
 
@@ -154,11 +173,17 @@ export function App() {
   async function saveToken() {
     setError(null);
     setMessage(null);
+    const normalizedToken = token.trim();
+    if (!normalizedToken) {
+      setError("APIトークンを入力してください");
+      return;
+    }
     try {
-      await window.jgrantsApi.setToken(token);
+      await window.jgrantsApi.setToken(normalizedToken);
+      setToken(normalizedToken);
       setMessage("トークンを保存しました");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "トークン保存失敗");
+      setError(toUserError(e, "トークン保存失敗"));
     }
   }
 
