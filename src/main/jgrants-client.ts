@@ -67,7 +67,11 @@ const detailResponseV1Schema = z.union([
 ]);
 
 function authHeader(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return { "Content-Type": "application/json" };
+  }
+  return { Authorization: `Bearer ${trimmed}`, "Content-Type": "application/json" };
 }
 
 function buildSearchParams(query: GrantSearchQuery): URLSearchParams {

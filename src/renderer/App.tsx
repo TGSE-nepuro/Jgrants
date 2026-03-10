@@ -12,8 +12,8 @@ function createRequestId(): string {
 
 function toUserError(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
-  if (error.message.includes("String must contain at least 1 character")) {
-    return "APIトークンを入力してください";
+  if (error.message.includes("401")) {
+    return "認証が必要です。APIトークンを設定してください";
   }
   return error.message;
 }
@@ -46,7 +46,6 @@ export function App() {
 
   useEffect(() => {
     const normalizedToken = token.trim();
-    if (!normalizedToken) return;
     void (async () => {
       try {
         const loaded = await window.jgrantsApi.listRegions(normalizedToken, { requestId: createRequestId() });
@@ -94,10 +93,6 @@ export function App() {
     setError(null);
     setMessage(null);
     const normalizedToken = token.trim();
-    if (!normalizedToken) {
-      setError("APIトークンを入力してください");
-      return;
-    }
 
     try {
       const pendingRegion = regionInput.trim();
@@ -133,10 +128,6 @@ export function App() {
     setError(null);
     setMessage(null);
     const normalizedToken = token.trim();
-    if (!normalizedToken) {
-      setError("APIトークンを入力してください");
-      return;
-    }
     try {
       setDetail(await window.jgrantsApi.detail(normalizedToken, item.id, { requestId: createRequestId() }));
     } catch (e) {
@@ -237,12 +228,13 @@ export function App() {
         <span className={`token-state ${hasToken ? "ok" : "warn"}`}>
           {hasToken ? "APIトークン設定済み" : "APIトークン未設定"}
         </span>
+        <span>トークン任意: 補助金検索・詳細取得・API地域候補更新</span>
+        <span>未設定でも呼び出しを試行します。401時はトークンを設定してください。</span>
         <span>トークン不要: お気に入り閲覧/削除・CSV出力・地域選択編集</span>
-        <span>トークン必須: 補助金検索・詳細取得・API地域候補更新</span>
       </div>
       <main>
         <section>
-          <h2>検索 <span className="badge required">要トークン</span></h2>
+          <h2>検索 <span className="badge optional">トークン任意</span></h2>
           <form onSubmit={onSearch}>
             <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
             <div className="region-picker">
@@ -278,13 +270,7 @@ export function App() {
               />
               全国案件を含める
             </label>
-            <button
-              type="submit"
-              disabled={!hasToken}
-              title={!hasToken ? "APIトークン設定後に利用できます" : undefined}
-            >
-              検索
-            </button>
+            <button type="submit">検索</button>
             <button type="button" onClick={() => void exportCsv()}>
               比較CSV出力 <span className="badge optional">トークン不要</span>
             </button>
@@ -313,13 +299,7 @@ export function App() {
                   checked={selectedIds.includes(item.id)}
                   onChange={() => toggleSelection(item.id)}
                 />
-                <button
-                  onClick={() => void openDetail(item)}
-                  disabled={!hasToken}
-                  title={!hasToken ? "APIトークン設定後に利用できます" : undefined}
-                >
-                  {item.title}
-                </button>
+                <button onClick={() => void openDetail(item)}>{item.title}</button>
                 {item.region && <span>{item.region}</span>}
                 <button onClick={() => void addFavorite(item)}>保存</button>
               </li>
@@ -327,7 +307,7 @@ export function App() {
           </ul>
         </section>
         <section>
-          <h2>詳細 <span className="badge required">要トークン</span></h2>
+          <h2>詳細 <span className="badge optional">トークン任意</span></h2>
           {detail ? (
             <article>
               <h3>{detail.title}</h3>

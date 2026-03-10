@@ -49,7 +49,7 @@ test('registerIpcHandlers registers all expected channels', () => {
   ]);
 });
 
-test('regions:list validates token and forwards trace', async () => {
+test('regions:list forwards trace and allows empty token', async () => {
   const { handlers, registrar } = createRegistrar();
   const calls = [];
   registerIpcHandlers(registrar, createDeps({
@@ -63,10 +63,12 @@ test('regions:list validates token and forwards trace', async () => {
   assert.deepEqual(res, ['全国', '東京都']);
   assert.deepEqual(calls, [{ token: 'token', trace: { requestId: 'req-r1' } }]);
 
-  assert.throws(() => handlers.get('regions:list')({}, ''));
+  const resEmpty = await handlers.get('regions:list')({}, '', { requestId: 'req-empty' });
+  assert.deepEqual(resEmpty, ['全国', '東京都']);
+  assert.deepEqual(calls[1], { token: '', trace: { requestId: 'req-empty' } });
 });
 
-test('grants:search validates and forwards token/query', async () => {
+test('grants:search forwards token/query and allows empty token', async () => {
   const { handlers, registrar } = createRegistrar();
   const calls = [];
   registerIpcHandlers(registrar, createDeps({
@@ -80,7 +82,9 @@ test('grants:search validates and forwards token/query', async () => {
   assert.equal(ok.length, 1);
   assert.deepEqual(calls, [{ token: 'token', query: { keyword: 'DX' }, trace: { requestId: 'req-1' } }]);
 
-  assert.throws(() => handlers.get('grants:search')({}, '', { keyword: 'DX' }));
+  const okEmpty = await handlers.get('grants:search')({}, '', { keyword: 'DX' }, { requestId: 'req-2' });
+  assert.equal(okEmpty.length, 1);
+  assert.deepEqual(calls[1], { token: '', query: { keyword: 'DX' }, trace: { requestId: 'req-2' } });
   assert.throws(() => handlers.get('grants:search')({}, 'token', { keyword: 'DX' }, { requestId: '' }));
 });
 

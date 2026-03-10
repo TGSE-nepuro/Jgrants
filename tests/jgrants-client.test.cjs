@@ -87,6 +87,19 @@ test('searchGrants does not fallback on authentication error', async () => {
   assert.equal(callCount, 1);
 });
 
+test('searchGrants omits Authorization header when token is empty', async () => {
+  let capturedHeaders;
+  global.fetch = async (_url, init) => {
+    capturedHeaders = init?.headers ?? null;
+    return mockResponse(200, { items: [] });
+  };
+
+  await searchGrants('', { keyword: 'no-auth' });
+  assert.ok(capturedHeaders);
+  const authValue = typeof capturedHeaders === 'object' ? capturedHeaders.Authorization : undefined;
+  assert.equal(authValue, undefined);
+});
+
 test('searchGrants throws combined error when v2 and v1 both fail', async () => {
   queueFetch([
     { status: 404, body: { error: 'v2 unsupported' } },
