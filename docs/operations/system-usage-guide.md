@@ -4,6 +4,7 @@
 - 本システムは jGrants API を扱う Electron デスクトップアプリです。
 - 対象OSは macOS / Windows です。
 - 主要機能は「検索」「詳細」「お気に入り」「CSV出力」「トークン管理」です。
+- 仕様の最新版は公式APIドキュメント（YAML配布元）を参照します: https://developers.digital.go.jp/documents/jgrants/api/
 
 ## 2. できること
 1. 補助金の検索
