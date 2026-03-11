@@ -1,6 +1,9 @@
 export type GrantSearchQuery = {
   keyword?: string;
   region?: string;
+  sort?: string;
+  order?: "ASC" | "DESC";
+  acceptance?: "0" | "1";
   openFrom?: string;
   openTo?: string;
 };

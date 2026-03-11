@@ -20,7 +20,10 @@ function toUserError(error: unknown, fallback: string): string {
 
 export function App() {
   const [token, setToken] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState("補助金");
+  const [sort, setSort] = useState("acceptance_end_datetime");
+  const [order, setOrder] = useState<"ASC" | "DESC">("ASC");
+  const [acceptance, setAcceptance] = useState<"0" | "1">("1");
   const [regionInput, setRegionInput] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [includeNationwide, setIncludeNationwide] = useState(true);
@@ -95,6 +98,11 @@ export function App() {
     const normalizedToken = token.trim();
 
     try {
+      const trimmedKeyword = keyword.trim();
+      if (trimmedKeyword.length < 2) {
+        setError("キーワードは2文字以上で入力してください");
+        return;
+      }
       const pendingRegion = regionInput.trim();
       let effectiveRegions = selectedRegions;
       if (pendingRegion) {
@@ -113,9 +121,19 @@ export function App() {
       const results = await Promise.all(
         (regionQueries.length > 0
           ? regionQueries.map((region) =>
-              window.jgrantsApi.search(normalizedToken, { keyword, region }, { requestId: createRequestId() })
+              window.jgrantsApi.search(
+                normalizedToken,
+                { keyword: trimmedKeyword, region, sort, order, acceptance },
+                { requestId: createRequestId() }
+              )
             )
-          : [window.jgrantsApi.search(normalizedToken, { keyword }, { requestId: createRequestId() })])
+          : [
+              window.jgrantsApi.search(
+                normalizedToken,
+                { keyword: trimmedKeyword, sort, order, acceptance },
+                { requestId: createRequestId() }
+              )
+            ])
       );
       setItems(mergeGrantResults(results));
       setSelectedIds([]);
@@ -236,7 +254,31 @@ export function App() {
         <section>
           <h2>検索 <span className="badge optional">トークン任意</span></h2>
           <form onSubmit={onSearch}>
-            <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
+            <input value={keyword} placeholder="キーワード（2文字以上）" onChange={(e) => setKeyword(e.target.value)} />
+            <div className="search-options">
+              <label>
+                並び順:
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  <option value="acceptance_end_datetime">募集終了日</option>
+                  <option value="acceptance_start_datetime">募集開始日</option>
+                  <option value="created_date">作成日</option>
+                </select>
+              </label>
+              <label>
+                昇順/降順:
+                <select value={order} onChange={(e) => setOrder(e.target.value as "ASC" | "DESC")}>
+                  <option value="ASC">昇順</option>
+                  <option value="DESC">降順</option>
+                </select>
+              </label>
+              <label>
+                受付状況:
+                <select value={acceptance} onChange={(e) => setAcceptance(e.target.value as "0" | "1")}>
+                  <option value="1">受付中</option>
+                  <option value="0">受付終了</option>
+                </select>
+              </label>
+            </div>
             <div className="region-picker">
               <input
                 value={regionInput}

@@ -18,6 +18,22 @@ header { display: flex; gap: 12px; align-items: center; }
 main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
 section { background: #fff; border: 1px solid #d9e0ea; border-radius: 8px; padding: 12px; }
 .error { color: #b71c1c; }
+.search-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0;
+}
+.search-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #394454;
+}
+.search-options select {
+  min-width: 140px;
+}
 .badge {
   font-size: 11px;
   font-weight: 700;

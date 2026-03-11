@@ -79,6 +79,9 @@ function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.keyword) params.set("keyword", query.keyword);
   if (query.region) params.set("region", query.region);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.order) params.set("order", query.order);
+  if (query.acceptance) params.set("acceptance", query.acceptance);
   if (query.openFrom) params.set("open_from", query.openFrom);
   if (query.openTo) params.set("open_to", query.openTo);
   return params;
