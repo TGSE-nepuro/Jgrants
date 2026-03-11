@@ -33,3 +33,10 @@ export type FavoriteGrant = {
 export type RequestTraceContext = {
   requestId?: string;
 };
+
+export type LogEntry = {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  message: string;
+  meta?: unknown;
+};

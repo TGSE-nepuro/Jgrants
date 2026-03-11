@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
+import { FavoriteGrant, GrantDetail, GrantSummary, LogEntry } from "../shared/types";
 import { isRegionOption, REGION_OPTIONS, suggestRegions } from "../shared/regions";
 import { buildRegionQueries, mergeGrantResults } from "../shared/grant-search-utils";
 
@@ -32,6 +32,7 @@ export function App() {
   const [detail, setDetail] = useState<GrantDetail | null>(null);
   const [favorites, setFavorites] = useState<FavoriteGrant[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasToken = token.trim().length > 0;
@@ -44,6 +45,7 @@ export function App() {
       ]);
       setFavorites(savedFavorites);
       setToken(savedToken);
+      void refreshLogs();
     })();
   }, []);
 
@@ -89,6 +91,19 @@ export function App() {
 
   function removeRegion(value: string) {
     setSelectedRegions((current) => current.filter((region) => region !== value));
+  }
+
+  async function refreshLogs() {
+    try {
+      setLogs(await window.jgrantsApi.listLogs());
+    } catch {
+      // ignore log load errors
+    }
+  }
+
+  async function clearLogs() {
+    await window.jgrantsApi.clearLogs();
+    setLogs([]);
   }
 
   async function onSearch(event: FormEvent) {
@@ -139,6 +154,8 @@ export function App() {
       setSelectedIds([]);
     } catch (e) {
       setError(toUserError(e, "検索失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -150,6 +167,8 @@ export function App() {
       setDetail(await window.jgrantsApi.detail(normalizedToken, item.id, { requestId: createRequestId() }));
     } catch (e) {
       setError(toUserError(e, "詳細取得失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -194,6 +213,8 @@ export function App() {
       setMessage("トークンを保存しました");
     } catch (e) {
       setError(toUserError(e, "トークン保存失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -206,6 +227,8 @@ export function App() {
       setMessage("トークンを削除しました");
     } catch (e) {
       setError(e instanceof Error ? e.message : "トークン削除失敗");
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -225,6 +248,8 @@ export function App() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "CSV出力失敗");
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -370,6 +395,46 @@ export function App() {
               </li>
             ))}
           </ul>
+        </section>
+        <section>
+          <h2>操作ログ</h2>
+          <div className="log-actions">
+            <button type="button" onClick={() => void refreshLogs()}>更新</button>
+            <button type="button" onClick={() => void clearLogs()}>クリア</button>
+          </div>
+          <div className="log-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>時刻</th>
+                  <th>レベル</th>
+                  <th>メッセージ</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>ログはありません</td>
+                  </tr>
+                ) : (
+                  logs
+                    .slice()
+                    .reverse()
+                    .map((entry, index) => (
+                      <tr key={`${entry.timestamp}-${index}`}>
+                        <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                        <td>{entry.level}</td>
+                        <td>{entry.message}</td>
+                        <td>
+                          <pre>{JSON.stringify(entry.meta ?? {}, null, 2)}</pre>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

@@ -4,6 +4,7 @@ import { fetchGrantDetail, listRegions, searchGrants } from "./jgrants-client";
 import { listFavorites, removeFavorite, saveFavorite } from "./favorites-store";
 import { exportGrantsCsv } from "./csv-export";
 import { clearToken, getToken, setToken } from "./token-store";
+import { clearLogs, listLogs } from "./log-store";
 
 registerIpcHandlers(ipcMain, {
   searchGrants,
@@ -15,5 +16,7 @@ registerIpcHandlers(ipcMain, {
   exportCsv: exportGrantsCsv,
   getToken,
   setToken,
-  clearToken
+  clearToken,
+  listLogs: async () => listLogs(),
+  clearLogs: async () => clearLogs()
 });

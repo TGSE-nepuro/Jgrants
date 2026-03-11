@@ -34,6 +34,34 @@ section { background: #fff; border: 1px solid #d9e0ea; border-radius: 8px; paddi
 .search-options select {
   min-width: 140px;
 }
+.log-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.log-table {
+  overflow: auto;
+  max-height: 260px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.log-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.log-table th,
+.log-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  text-align: left;
+}
+.log-table pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .badge {
   font-size: 11px;
   font-weight: 700;

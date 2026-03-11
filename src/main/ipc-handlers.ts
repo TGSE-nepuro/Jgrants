@@ -4,6 +4,7 @@ import {
   GrantDetail,
   GrantSearchQuery,
   GrantSummary,
+  LogEntry,
   RequestTraceContext
 } from "../shared/types";
 
@@ -30,6 +31,8 @@ export type IpcDependencies = {
   getToken: () => Promise<string>;
   setToken: (token: string) => Promise<void>;
   clearToken: () => Promise<void>;
+  listLogs: () => Promise<LogEntry[]>;
+  clearLogs: () => Promise<void>;
 };
 
 const searchQuerySchema = z.object({
@@ -114,6 +117,13 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
 
   registrar.handle("token:clear", async () => {
     await deps.clearToken();
+    return { ok: true };
+  });
+
+  registrar.handle("logs:list", () => deps.listLogs());
+
+  registrar.handle("logs:clear", async () => {
+    await deps.clearLogs();
     return { ok: true };
   });
 }

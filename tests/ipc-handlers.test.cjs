@@ -27,6 +27,8 @@ function createDeps(overrides = {}) {
     getToken: async () => 'stored-token',
     setToken: async () => undefined,
     clearToken: async () => undefined,
+    listLogs: async () => [],
+    clearLogs: async () => undefined,
     ...overrides
   };
 }
@@ -42,6 +44,8 @@ test('registerIpcHandlers registers all expected channels', () => {
     'grants:detail',
     'grants:exportCsv',
     'grants:search',
+    'logs:clear',
+    'logs:list',
     'regions:list',
     'token:clear',
     'token:get',
