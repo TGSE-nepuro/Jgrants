@@ -2,8 +2,9 @@ import { z } from "zod";
 import { GrantDetail, GrantSearchQuery, GrantSummary, RequestTraceContext } from "../shared/types";
 import { logError, logInfo, logWarn } from "./logger";
 
-const V2_BASE_URL = "https://api.jgrants-portal.go.jp/v2";
-const V1_BASE_URL = "https://api.jgrants-portal.go.jp/v1";
+const EXP_BASE_URL = "https://api.jgrants-portal.go.jp/exp";
+const V2_BASE_URL = `${EXP_BASE_URL}/v2/public`;
+const V1_BASE_URL = `${EXP_BASE_URL}/v1/public`;
 
 const idSchema = z.union([z.string(), z.number()]).transform((value) => String(value));
 
@@ -229,46 +230,6 @@ export async function searchGrants(
   const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
   const params = buildSearchParams(query);
-  const v2 = await requestJson(
-    token,
-    V2_BASE_URL,
-    "/subsidies",
-    { requestId, operation: "search", apiVersion: "v2" },
-    params
-  );
-
-  if (v2.status >= 200 && v2.status < 300) {
-    const grants = parseSearchV2(v2.body);
-    logInfo("jgrants search completed", {
-      requestId,
-      apiVersion: "v2",
-      status: v2.status,
-      resultCount: grants.length,
-      durationMs: Date.now() - startedAt
-    });
-    return grants;
-  }
-
-  if (!shouldFallback(v2.status)) {
-    logWarn("jgrants search failed without fallback", {
-      requestId,
-      endpoint: "/subsidies",
-      apiVersion: "v2",
-      status: v2.status,
-      durationMs: v2.durationMs
-    });
-    throw new Error(`Search failed on v2: ${v2.status}`);
-  }
-
-  logWarn("Fallback to v1 for search", {
-    requestId,
-    endpoint: "/subsidies",
-    fromVersion: "v2",
-    toVersion: "v1",
-    status: v2.status,
-    durationMs: v2.durationMs,
-    query
-  });
   const v1 = await requestJson(
     token,
     V1_BASE_URL,
@@ -288,13 +249,14 @@ export async function searchGrants(
     return grants;
   }
 
-  logWarn("jgrants search failed after fallback", {
+  logWarn("jgrants search failed without fallback", {
     requestId,
-    v2Status: v2.status,
-    v1Status: v1.status,
-    totalDurationMs: Date.now() - startedAt
+    endpoint: "/subsidies",
+    apiVersion: "v1",
+    status: v1.status,
+    durationMs: v1.durationMs
   });
-  throw new Error(`Search failed on v2(${v2.status}) and v1(${v1.status})`);
+  throw new Error(`Search failed on v1: ${v1.status}`);
 }
 
 export async function fetchGrantDetail(
@@ -304,7 +266,7 @@ export async function fetchGrantDetail(
 ): Promise<GrantDetail> {
   const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
-  const endpoint = `/subsidies/${grantId}`;
+  const endpoint = `/subsidies/id/${grantId}`;
   const v2 = await requestJson(
     token,
     V2_BASE_URL,

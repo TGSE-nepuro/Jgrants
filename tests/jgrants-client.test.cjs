@@ -50,13 +50,10 @@ test.afterEach(() => {
   console.log = originalLog;
 });
 
-test('searchGrants falls back from v2 to v1 when v2 is unsupported', async () => {
+test('searchGrants uses v1 public endpoint', async () => {
   const calls = [];
   global.fetch = async (url) => {
     calls.push(String(url));
-    if (String(url).includes('/v2/subsidies')) {
-      return mockResponse(404, { error: 'not found' });
-    }
     return mockResponse(200, {
       items: [{ subsidy_id: 's-1', name: '補助金A', organization_name: '機関A', close_date: '2026-12-31' }]
     });
@@ -64,9 +61,8 @@ test('searchGrants falls back from v2 to v1 when v2 is unsupported', async () =>
 
   const result = await searchGrants('token', { keyword: 'IT' });
 
-  assert.equal(calls.length, 2);
-  assert.match(calls[0], /\/v2\/subsidies/);
-  assert.match(calls[1], /\/v1\/subsidies/);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/exp\/v1\/public\/subsidies/);
   assert.deepEqual(result[0], {
     id: 's-1',
     title: '補助金A',
@@ -83,7 +79,7 @@ test('searchGrants does not fallback on authentication error', async () => {
     return mockResponse(401, { error: 'unauthorized' });
   };
 
-  await assert.rejects(() => searchGrants('bad-token', { keyword: 'DX' }), /Search failed on v2: 401/);
+  await assert.rejects(() => searchGrants('bad-token', { keyword: 'DX' }), /Search failed on v1: 401/);
   assert.equal(callCount, 1);
 });
 
@@ -100,35 +96,17 @@ test('searchGrants omits Authorization header when token is empty', async () => 
   assert.equal(authValue, undefined);
 });
 
-test('searchGrants throws combined error when v2 and v1 both fail', async () => {
-  queueFetch([
-    { status: 404, body: { error: 'v2 unsupported' } },
-    { status: 500, body: { error: 'v1 failed' } }
-  ]);
-
-  await assert.rejects(
-    () => searchGrants('token', { keyword: 'AI' }),
-    /Search failed on v2\(404\) and v1\(500\)/
-  );
-});
-
 test('searchGrants rejects invalid v1 payload shape after fallback', async () => {
-  queueFetch([
-    { status: 404, body: { error: 'v2 unsupported' } },
-    { status: 200, body: { items: [{ subsidy_id: 's-1', name: '補助金A' }] } }
-  ]);
+  queueFetch([{ status: 200, body: { items: [{ subsidy_id: 's-1', name: '補助金A' }] } }]);
 
-  await assert.rejects(
-    () => searchGrants('token', { keyword: 'AI' }),
-    /Invalid v1 search payload/
-  );
+  await assert.rejects(() => searchGrants('token', { keyword: 'AI' }), /Invalid v1 search payload/);
 });
 
 test('searchGrants rejects malformed success payload', async () => {
   queueFetch([{ status: 200, body: { message: 'ok but no items key' } }]);
   await assert.rejects(
     () => searchGrants('token', { keyword: 'cloud' }),
-    /Invalid v2 search payload/
+    /Invalid v1 search payload/
   );
 });
 
@@ -141,7 +119,7 @@ test('fetchGrantDetail falls back and maps v1 style payload keys', async () => {
   const calls = [];
   global.fetch = async (url) => {
     calls.push(String(url));
-    if (String(url).includes('/v2/subsidies/abc')) {
+    if (String(url).includes('/exp/v2/public/subsidies/id/abc')) {
       return mockResponse(410, { error: 'gone' });
     }
     return mockResponse(200, {
@@ -160,8 +138,8 @@ test('fetchGrantDetail falls back and maps v1 style payload keys', async () => {
   const detail = await fetchGrantDetail('token', 'abc');
 
   assert.equal(calls.length, 2);
-  assert.match(calls[0], /\/v2\/subsidies\/abc/);
-  assert.match(calls[1], /\/v1\/subsidies\/abc/);
+  assert.match(calls[0], /\/exp\/v2\/public\/subsidies\/id\/abc/);
+  assert.match(calls[1], /\/exp\/v1\/public\/subsidies\/id\/abc/);
   assert.deepEqual(detail, {
     id: 'abc',
     title: '補助金B',
@@ -208,24 +186,6 @@ test('fetchGrantDetail handles invalid json response as missing payload', async 
   await assert.rejects(() => fetchGrantDetail('token', 'x3'), /Invalid v2 detail payload/);
 });
 
-test('search fallback warning includes requestId and timing fields', async () => {
-  const warnings = captureConsoleJson('warn');
-  queueFetch([
-    { status: 404, body: { error: 'v2 unsupported' } },
-    { status: 200, body: { items: [{ subsidy_id: 's-3', name: '補助金C', ministry: '省庁C' }] } }
-  ]);
-
-  await searchGrants('token', { keyword: 'fallback' });
-
-  const fallbackWarn = warnings.find((line) => line.message === 'Fallback to v1 for search');
-  assert.ok(fallbackWarn);
-  assert.equal(fallbackWarn.meta.fromVersion, 'v2');
-  assert.equal(fallbackWarn.meta.toVersion, 'v1');
-  assert.equal(typeof fallbackWarn.meta.requestId, 'string');
-  assert.ok(fallbackWarn.meta.requestId.length > 0);
-  assert.equal(typeof fallbackWarn.meta.durationMs, 'number');
-});
-
 test('requestJson network errors are logged with request context', async () => {
   const errors = captureConsoleJson('error');
   queueFetch([{ throwError: new Error('network down hard') }]);
@@ -235,7 +195,7 @@ test('requestJson network errors are logged with request context', async () => {
   const errorLine = errors.find((line) => line.message === 'jgrants request failed');
   assert.ok(errorLine);
   assert.equal(errorLine.meta.operation, 'search');
-  assert.equal(errorLine.meta.apiVersion, 'v2');
+  assert.equal(errorLine.meta.apiVersion, 'v1');
   assert.equal(typeof errorLine.meta.requestId, 'string');
   assert.equal(typeof errorLine.meta.durationMs, 'number');
   assert.equal(errorLine.meta.error, 'network down hard');
@@ -243,7 +203,12 @@ test('requestJson network errors are logged with request context', async () => {
 
 test('searchGrants keeps provided requestId in completion logs', async () => {
   const infos = captureConsoleJson('log');
-  queueFetch([{ status: 200, body: { items: [{ id: 'g1', title: '補助金', organization: '機関' }] } }]);
+  queueFetch([
+    {
+      status: 200,
+      body: { items: [{ subsidy_id: 'g1', name: '補助金', organization_name: '機関' }] }
+    }
+  ]);
 
   await searchGrants('token', { keyword: 'trace' }, { requestId: 'ui-trace-123' });
 
@@ -258,9 +223,9 @@ test('listRegions extracts unique tokens from grant regions', async () => {
       status: 200,
       body: {
         items: [
-          { id: 'g1', title: 'A', organization: 'Org', region: '東京都/大阪府' },
-          { id: 'g2', title: 'B', organization: 'Org', region: '全国' },
-          { id: 'g3', title: 'C', organization: 'Org', region: '東京都' }
+          { subsidy_id: 'g1', name: 'A', ministry: 'Org', prefecture: '東京都/大阪府' },
+          { subsidy_id: 'g2', name: 'B', ministry: 'Org', target_region: '全国' },
+          { subsidy_id: 'g3', name: 'C', ministry: 'Org', prefecture: '東京都' }
         ]
       }
     }
