@@ -69,7 +69,10 @@ test('searchGrants uses v1 public endpoint', async () => {
   assert.equal(calls.length, 1);
   assert.match(calls[0], /\/exp\/v1\/public\/subsidies/);
   const url = new URL(calls[0]);
-  assert.ok(url.searchParams.get('request'));
+  assert.equal(url.searchParams.get('keyword'), 'IT');
+  assert.equal(url.searchParams.get('sort'), 'acceptance_end_datetime');
+  assert.equal(url.searchParams.get('order'), 'ASC');
+  assert.equal(url.searchParams.get('acceptance'), '1');
   assert.deepEqual(result[0], {
     id: 's-1',
     title: '補助金A',

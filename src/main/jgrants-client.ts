@@ -76,17 +76,14 @@ function authHeader(token: string): HeadersInit {
 }
 
 function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
-  const request: Record<string, string> = {};
-  if (query.keyword) request.keyword = query.keyword;
-  if (query.sort) request.sort = query.sort;
-  if (query.order) request.order = query.order;
-  if (query.acceptance) request.acceptance = query.acceptance;
-  if (query.region) request.target_area_search = query.region;
-  if (query.openFrom) request.acceptance_start_datetime = query.openFrom;
-  if (query.openTo) request.acceptance_end_datetime = query.openTo;
-
   const params = new URLSearchParams();
-  params.set("request", JSON.stringify(request));
+  if (query.keyword) params.set("keyword", query.keyword);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.order) params.set("order", query.order);
+  if (query.acceptance) params.set("acceptance", query.acceptance);
+  if (query.region) params.set("target_area_search", query.region);
+  if (query.openFrom) params.set("acceptance_start_datetime", query.openFrom);
+  if (query.openTo) params.set("acceptance_end_datetime", query.openTo);
   return params;
 }
 
