@@ -127,6 +127,19 @@ test('searchGrants rejects malformed success payload', async () => {
   );
 });
 
+test('searchGrants accepts v1 payload using result key', async () => {
+  queueFetch([
+    {
+      status: 200,
+      body: { result: [{ subsidy_id: 's-9', name: '補助金X', ministry: '省庁X' }] }
+    }
+  ]);
+
+  const result = await searchGrants('token', { keyword: 'result' });
+  assert.equal(result[0].id, 's-9');
+  assert.equal(result[0].title, '補助金X');
+});
+
 test('searchGrants propagates network error', async () => {
   queueFetch([{ throwError: new Error('network down') }]);
   await assert.rejects(() => searchGrants('token', { keyword: 'security' }), /network down/);

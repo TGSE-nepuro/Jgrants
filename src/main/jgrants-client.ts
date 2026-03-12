@@ -54,7 +54,8 @@ const grantDetailV1Schema = grantSummaryV1BaseSchema
 const searchResponseV2Schema = z.object({ items: z.array(grantSummaryV2Schema) });
 const searchResponseV1Schema = z.union([
   z.object({ items: z.array(grantSummaryV1Schema) }),
-  z.object({ data: z.array(grantSummaryV1Schema) })
+  z.object({ data: z.array(grantSummaryV1Schema) }),
+  z.object({ result: z.array(grantSummaryV1Schema) })
 ]);
 
 const detailResponseV2Schema = z.union([
@@ -160,7 +161,10 @@ function parseSearchV1(body: unknown): GrantSummary[] {
   if ("items" in parsed.data) {
     return parsed.data.items.map(mapSummaryFromV1);
   }
-  return parsed.data.data.map(mapSummaryFromV1);
+  if ("data" in parsed.data) {
+    return parsed.data.data.map(mapSummaryFromV1);
+  }
+  return parsed.data.result.map(mapSummaryFromV1);
 }
 
 function parseDetailV2(body: unknown): GrantDetail {
