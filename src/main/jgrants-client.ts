@@ -197,6 +197,13 @@ function parseSearchV1(body: unknown): GrantSummary[] {
 function parseDetailV2(body: unknown): GrantDetail {
   const parsed = detailResponseV2Schema.safeParse(body);
   if (!parsed.success) {
+    if (body && typeof body === "object") {
+      const keys = Object.keys(body as Record<string, unknown>);
+      logWarn("jgrants detail payload shape mismatch", {
+        keys,
+        sample: JSON.stringify(body).slice(0, 300)
+      });
+    }
     throw new Error(`Invalid v2 detail payload: ${parsed.error.issues[0]?.message ?? "schema error"}`);
   }
 
