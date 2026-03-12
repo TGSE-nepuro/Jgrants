@@ -204,20 +204,21 @@ async function requestJson(
   path: string,
   context: { requestId: string; operation: "search" | "detail"; apiVersion: "v1" | "v2" },
   query?: URLSearchParams
-): Promise<{ status: number; body: unknown; durationMs: number }> {
+): Promise<{ status: number; body: unknown; durationMs: number; url: string }> {
   const url = `${baseUrl}${path}${query ? `?${query.toString()}` : ""}`;
   const startedAt = Date.now();
 
   try {
     const response = await fetch(url, { headers: authHeader(token) });
     const body = await response.json().catch(() => null);
-    return { status: response.status, body, durationMs: Date.now() - startedAt };
+    return { status: response.status, body, durationMs: Date.now() - startedAt, url };
   } catch (error) {
     logError("jgrants request failed", {
       requestId: context.requestId,
       operation: context.operation,
       endpoint: path,
       apiVersion: context.apiVersion,
+      url,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -257,7 +258,9 @@ export async function searchGrants(
     endpoint: "/subsidies",
     apiVersion: "v1",
     status: v1.status,
-    durationMs: v1.durationMs
+    durationMs: v1.durationMs,
+    url: v1.url,
+    query: Object.fromEntries(params.entries())
   });
   throw new Error(`Search failed on v1: ${v1.status}`);
 }
@@ -294,7 +297,8 @@ export async function fetchGrantDetail(
       endpoint,
       apiVersion: "v2",
       status: v2.status,
-      durationMs: v2.durationMs
+      durationMs: v2.durationMs,
+      url: v2.url
     });
     throw new Error(`Detail failed on v2: ${v2.status}`);
   }
@@ -305,7 +309,8 @@ export async function fetchGrantDetail(
     fromVersion: "v2",
     toVersion: "v1",
     status: v2.status,
-    durationMs: v2.durationMs
+    durationMs: v2.durationMs,
+    url: v2.url
   });
   const v1 = await requestJson(token, V1_BASE_URL, endpoint, {
     requestId,
@@ -329,7 +334,9 @@ export async function fetchGrantDetail(
     grantId,
     v2Status: v2.status,
     v1Status: v1.status,
-    totalDurationMs: Date.now() - startedAt
+    totalDurationMs: Date.now() - startedAt,
+    v2Url: v2.url,
+    v1Url: v1.url
   });
   throw new Error(`Detail failed on v2(${v2.status}) and v1(${v1.status})`);
 }
