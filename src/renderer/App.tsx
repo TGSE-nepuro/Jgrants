@@ -18,6 +18,18 @@ function toUserError(error: unknown, fallback: string): string {
   return error.message;
 }
 
+function normalizeDetailText(raw?: string): string {
+  if (!raw) return "";
+  const withBreaks = raw
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n");
+  const doc = new DOMParser().parseFromString(withBreaks, "text/html");
+  const text = doc.body.textContent ?? "";
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function App() {
   const [token, setToken] = useState("");
   const [keyword, setKeyword] = useState("補助金");
@@ -379,7 +391,7 @@ export function App() {
             <article>
               <h3>{detail.title}</h3>
               <p>{detail.organization}</p>
-              <p>{detail.description}</p>
+              <pre className="detail-text">{normalizeDetailText(detail.description)}</pre>
             </article>
           ) : (
             <p>未選択</p>
