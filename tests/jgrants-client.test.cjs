@@ -59,12 +59,7 @@ test('searchGrants uses v1 public endpoint', async () => {
     });
   };
 
-  const result = await searchGrants('token', {
-    keyword: 'IT',
-    sort: 'acceptance_end_datetime',
-    order: 'ASC',
-    acceptance: '1'
-  });
+  const result = await searchGrants('token', { keyword: 'IT' });
 
   assert.equal(calls.length, 1);
   assert.match(calls[0], /\/exp\/v1\/public\/subsidies/);

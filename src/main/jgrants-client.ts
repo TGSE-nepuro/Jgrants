@@ -78,9 +78,9 @@ function authHeader(token: string): HeadersInit {
 function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.keyword) params.set("keyword", query.keyword);
-  if (query.sort) params.set("sort", query.sort);
-  if (query.order) params.set("order", query.order);
-  if (query.acceptance) params.set("acceptance", query.acceptance);
+  params.set("sort", query.sort ?? "acceptance_end_datetime");
+  params.set("order", query.order ?? "ASC");
+  params.set("acceptance", query.acceptance ?? "1");
   if (query.region) params.set("target_area_search", query.region);
   if (query.openFrom) params.set("acceptance_start_datetime", query.openFrom);
   if (query.openTo) params.set("acceptance_end_datetime", query.openTo);
