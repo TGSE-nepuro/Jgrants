@@ -4,6 +4,7 @@ import {
   GrantDetail,
   GrantSearchQuery,
   GrantSummary,
+  LogEntry,
   RequestTraceContext
 } from "../shared/types";
 
@@ -30,6 +31,8 @@ export type IpcDependencies = {
   getToken: () => Promise<string>;
   setToken: (token: string) => Promise<void>;
   clearToken: () => Promise<void>;
+  listLogs: () => Promise<LogEntry[]>;
+  clearLogs: () => Promise<void>;
 };
 
 const searchQuerySchema = z.object({
@@ -62,7 +65,7 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
   registrar.handle(
     "grants:search",
     (_event: unknown, tokenRaw: unknown, queryRaw: unknown, traceRaw: unknown) => {
-      const token = z.string().min(1).parse(tokenRaw);
+      const token = z.string().parse(tokenRaw);
       const query = searchQuerySchema.parse(queryRaw);
       const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
       return deps.searchGrants(token, query, trace);
@@ -72,7 +75,7 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
   registrar.handle(
     "grants:detail",
     (_event: unknown, tokenRaw: unknown, grantIdRaw: unknown, traceRaw: unknown) => {
-      const token = z.string().min(1).parse(tokenRaw);
+      const token = z.string().parse(tokenRaw);
       const grantId = z.string().min(1).parse(grantIdRaw);
       const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
       return deps.fetchGrantDetail(token, grantId, trace);
@@ -80,7 +83,7 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
   );
 
   registrar.handle("regions:list", (_event: unknown, tokenRaw: unknown, traceRaw: unknown) => {
-    const token = z.string().min(1).parse(tokenRaw);
+    const token = z.string().parse(tokenRaw);
     const trace = traceRaw == null ? undefined : requestTraceSchema.parse(traceRaw);
     return deps.listRegions(token, trace);
   });
@@ -114,6 +117,13 @@ export function registerIpcHandlers(registrar: IpcRegistrar, deps: IpcDependenci
 
   registrar.handle("token:clear", async () => {
     await deps.clearToken();
+    return { ok: true };
+  });
+
+  registrar.handle("logs:list", () => deps.listLogs());
+
+  registrar.handle("logs:clear", async () => {
+    await deps.clearLogs();
     return { ok: true };
   });
 }

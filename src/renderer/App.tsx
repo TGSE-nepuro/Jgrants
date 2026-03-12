@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { FavoriteGrant, GrantDetail, GrantSummary } from "../shared/types";
+import { FavoriteGrant, GrantDetail, GrantSummary, LogEntry } from "../shared/types";
 import { isRegionOption, REGION_OPTIONS, suggestRegions } from "../shared/regions";
 import { buildRegionQueries, mergeGrantResults } from "../shared/grant-search-utils";
 
@@ -12,15 +12,30 @@ function createRequestId(): string {
 
 function toUserError(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
-  if (error.message.includes("String must contain at least 1 character")) {
-    return "APIトークンを入力してください";
+  if (error.message.includes("401")) {
+    return "認証が必要です。APIトークンを設定してください";
   }
   return error.message;
 }
 
+function normalizeDetailText(raw?: string): string {
+  if (!raw) return "";
+  const withBreaks = raw
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n");
+  const doc = new DOMParser().parseFromString(withBreaks, "text/html");
+  const text = doc.body.textContent ?? "";
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function App() {
   const [token, setToken] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState("補助金");
+  const [sort, setSort] = useState("acceptance_end_datetime");
+  const [order, setOrder] = useState<"ASC" | "DESC">("ASC");
+  const [acceptance, setAcceptance] = useState<"0" | "1">("1");
   const [regionInput, setRegionInput] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [includeNationwide, setIncludeNationwide] = useState(true);
@@ -29,8 +44,10 @@ export function App() {
   const [detail, setDetail] = useState<GrantDetail | null>(null);
   const [favorites, setFavorites] = useState<FavoriteGrant[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasToken = token.trim().length > 0;
 
   useEffect(() => {
     void (async () => {
@@ -40,12 +57,12 @@ export function App() {
       ]);
       setFavorites(savedFavorites);
       setToken(savedToken);
+      void refreshLogs();
     })();
   }, []);
 
   useEffect(() => {
     const normalizedToken = token.trim();
-    if (!normalizedToken) return;
     void (async () => {
       try {
         const loaded = await window.jgrantsApi.listRegions(normalizedToken, { requestId: createRequestId() });
@@ -88,17 +105,31 @@ export function App() {
     setSelectedRegions((current) => current.filter((region) => region !== value));
   }
 
+  async function refreshLogs() {
+    try {
+      setLogs(await window.jgrantsApi.listLogs());
+    } catch {
+      // ignore log load errors
+    }
+  }
+
+  async function clearLogs() {
+    await window.jgrantsApi.clearLogs();
+    setLogs([]);
+  }
+
   async function onSearch(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setMessage(null);
     const normalizedToken = token.trim();
-    if (!normalizedToken) {
-      setError("APIトークンを入力してください");
-      return;
-    }
 
     try {
+      const trimmedKeyword = keyword.trim();
+      if (trimmedKeyword.length < 2) {
+        setError("キーワードは2文字以上で入力してください");
+        return;
+      }
       const pendingRegion = regionInput.trim();
       let effectiveRegions = selectedRegions;
       if (pendingRegion) {
@@ -117,14 +148,26 @@ export function App() {
       const results = await Promise.all(
         (regionQueries.length > 0
           ? regionQueries.map((region) =>
-              window.jgrantsApi.search(normalizedToken, { keyword, region }, { requestId: createRequestId() })
+              window.jgrantsApi.search(
+                normalizedToken,
+                { keyword: trimmedKeyword, region, sort, order, acceptance },
+                { requestId: createRequestId() }
+              )
             )
-          : [window.jgrantsApi.search(normalizedToken, { keyword }, { requestId: createRequestId() })])
+          : [
+              window.jgrantsApi.search(
+                normalizedToken,
+                { keyword: trimmedKeyword, sort, order, acceptance },
+                { requestId: createRequestId() }
+              )
+            ])
       );
       setItems(mergeGrantResults(results));
       setSelectedIds([]);
     } catch (e) {
       setError(toUserError(e, "検索失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -132,14 +175,12 @@ export function App() {
     setError(null);
     setMessage(null);
     const normalizedToken = token.trim();
-    if (!normalizedToken) {
-      setError("APIトークンを入力してください");
-      return;
-    }
     try {
       setDetail(await window.jgrantsApi.detail(normalizedToken, item.id, { requestId: createRequestId() }));
     } catch (e) {
       setError(toUserError(e, "詳細取得失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -184,6 +225,8 @@ export function App() {
       setMessage("トークンを保存しました");
     } catch (e) {
       setError(toUserError(e, "トークン保存失敗"));
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -196,6 +239,8 @@ export function App() {
       setMessage("トークンを削除しました");
     } catch (e) {
       setError(e instanceof Error ? e.message : "トークン削除失敗");
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -215,6 +260,8 @@ export function App() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "CSV出力失敗");
+    } finally {
+      void refreshLogs();
     }
   }
 
@@ -232,11 +279,43 @@ export function App() {
         <button onClick={() => void saveToken()}>トークン保存</button>
         <button onClick={() => void clearToken()}>トークン削除</button>
       </header>
+      <div className="token-guide">
+        <span className={`token-state ${hasToken ? "ok" : "warn"}`}>
+          {hasToken ? "APIトークン設定済み" : "APIトークン未設定"}
+        </span>
+        <span>トークン任意: 補助金検索・詳細取得・API地域候補更新</span>
+        <span>未設定でも呼び出しを試行します。401時はトークンを設定してください。</span>
+        <span>トークン不要: お気に入り閲覧/削除・CSV出力・地域選択編集</span>
+      </div>
       <main>
         <section>
-          <h2>検索</h2>
+          <h2>検索 <span className="badge optional">トークン任意</span></h2>
           <form onSubmit={onSearch}>
-            <input value={keyword} placeholder="キーワード" onChange={(e) => setKeyword(e.target.value)} />
+            <input value={keyword} placeholder="キーワード（2文字以上）" onChange={(e) => setKeyword(e.target.value)} />
+            <div className="search-options">
+              <label>
+                並び順:
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  <option value="acceptance_end_datetime">募集終了日</option>
+                  <option value="acceptance_start_datetime">募集開始日</option>
+                  <option value="created_date">作成日</option>
+                </select>
+              </label>
+              <label>
+                昇順/降順:
+                <select value={order} onChange={(e) => setOrder(e.target.value as "ASC" | "DESC")}>
+                  <option value="ASC">昇順</option>
+                  <option value="DESC">降順</option>
+                </select>
+              </label>
+              <label>
+                受付状況:
+                <select value={acceptance} onChange={(e) => setAcceptance(e.target.value as "0" | "1")}>
+                  <option value="1">受付中</option>
+                  <option value="0">受付終了</option>
+                </select>
+              </label>
+            </div>
             <div className="region-picker">
               <input
                 value={regionInput}
@@ -271,7 +350,9 @@ export function App() {
               全国案件を含める
             </label>
             <button type="submit">検索</button>
-            <button type="button" onClick={() => void exportCsv()}>比較CSV出力</button>
+            <button type="button" onClick={() => void exportCsv()}>
+              比較CSV出力 <span className="badge optional">トークン不要</span>
+            </button>
           </form>
           <div className="selected-regions">
             <p>選択中の地域（×で削除）</p>
@@ -305,19 +386,19 @@ export function App() {
           </ul>
         </section>
         <section>
-          <h2>詳細</h2>
+          <h2>詳細 <span className="badge optional">トークン任意</span></h2>
           {detail ? (
             <article>
               <h3>{detail.title}</h3>
               <p>{detail.organization}</p>
-              <p>{detail.description}</p>
+              <pre className="detail-text">{normalizeDetailText(detail.description)}</pre>
             </article>
           ) : (
             <p>未選択</p>
           )}
         </section>
         <section>
-          <h2>お気に入り</h2>
+          <h2>お気に入り <span className="badge optional">トークン不要</span></h2>
           <ul>
             {favorites.map((f) => (
               <li key={f.id}>
@@ -326,6 +407,46 @@ export function App() {
               </li>
             ))}
           </ul>
+        </section>
+        <section>
+          <h2>操作ログ</h2>
+          <div className="log-actions">
+            <button type="button" onClick={() => void refreshLogs()}>更新</button>
+            <button type="button" onClick={() => void clearLogs()}>クリア</button>
+          </div>
+          <div className="log-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>時刻</th>
+                  <th>レベル</th>
+                  <th>メッセージ</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>ログはありません</td>
+                  </tr>
+                ) : (
+                  logs
+                    .slice()
+                    .reverse()
+                    .map((entry, index) => (
+                      <tr key={`${entry.timestamp}-${index}`}>
+                        <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                        <td>{entry.level}</td>
+                        <td>{entry.message}</td>
+                        <td>
+                          <pre>{JSON.stringify(entry.meta ?? {}, null, 2)}</pre>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

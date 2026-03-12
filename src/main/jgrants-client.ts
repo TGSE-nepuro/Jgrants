@@ -2,8 +2,9 @@ import { z } from "zod";
 import { GrantDetail, GrantSearchQuery, GrantSummary, RequestTraceContext } from "../shared/types";
 import { logError, logInfo, logWarn } from "./logger";
 
-const V2_BASE_URL = "https://api.jgrants-portal.go.jp/v2";
-const V1_BASE_URL = "https://api.jgrants-portal.go.jp/v1";
+const EXP_BASE_URL = "https://api.jgrants-portal.go.jp/exp";
+const V2_BASE_URL = `${EXP_BASE_URL}/v2/public`;
+const V1_BASE_URL = `${EXP_BASE_URL}/v1/public`;
 
 const idSchema = z.union([z.string(), z.number()]).transform((value) => String(value));
 
@@ -25,6 +26,14 @@ const grantSummaryV1BaseSchema = z.object({
   target_region: z.string().optional()
 });
 
+const grantSummaryV1ResultSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  title: z.string(),
+  target_area_search: z.string().optional(),
+  acceptance_end_datetime: z.string().optional()
+});
+
 const grantSummaryV1Schema = grantSummaryV1BaseSchema.refine(
   (value) => Boolean(value.organization_name || value.ministry),
   {
@@ -37,6 +46,15 @@ const grantDetailV2Schema = grantSummaryV2Schema.extend({
   eligibility: z.string().optional(),
   subsidy_rate: z.string().optional(),
   contact: z.string().optional()
+});
+
+const grantDetailV2ResultSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  title: z.string(),
+  detail: z.string().optional(),
+  subsidy_catch_phrase: z.string().nullable().optional(),
+  target_area_search: z.string().optional()
 });
 
 const grantDetailV1Schema = grantSummaryV1BaseSchema
@@ -53,12 +71,14 @@ const grantDetailV1Schema = grantSummaryV1BaseSchema
 const searchResponseV2Schema = z.object({ items: z.array(grantSummaryV2Schema) });
 const searchResponseV1Schema = z.union([
   z.object({ items: z.array(grantSummaryV1Schema) }),
-  z.object({ data: z.array(grantSummaryV1Schema) })
+  z.object({ data: z.array(grantSummaryV1Schema) }),
+  z.object({ result: z.array(z.union([grantSummaryV1Schema, grantSummaryV1ResultSchema])) })
 ]);
 
 const detailResponseV2Schema = z.union([
   z.object({ item: grantDetailV2Schema }),
-  z.object({ data: grantDetailV2Schema })
+  z.object({ data: grantDetailV2Schema }),
+  z.object({ result: z.array(z.union([grantDetailV2Schema, grantDetailV2ResultSchema])) })
 ]);
 
 const detailResponseV1Schema = z.union([
@@ -67,15 +87,23 @@ const detailResponseV1Schema = z.union([
 ]);
 
 function authHeader(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return { "Content-Type": "application/json" };
+  }
+  return { Authorization: `Bearer ${trimmed}`, "Content-Type": "application/json" };
 }
 
 function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
   const params = new URLSearchParams();
-  if (query.keyword) params.set("keyword", query.keyword);
-  if (query.region) params.set("region", query.region);
-  if (query.openFrom) params.set("open_from", query.openFrom);
-  if (query.openTo) params.set("open_to", query.openTo);
+  const keyword = query.keyword?.trim() || "補助金";
+  params.set("keyword", keyword);
+  params.set("sort", query.sort ?? "acceptance_end_datetime");
+  params.set("order", query.order ?? "ASC");
+  params.set("acceptance", query.acceptance ?? "1");
+  if (query.region) params.set("target_area_search", query.region);
+  if (query.openFrom) params.set("acceptance_start_datetime", query.openFrom);
+  if (query.openTo) params.set("acceptance_end_datetime", query.openTo);
   return params;
 }
 
@@ -106,6 +134,16 @@ function mapSummaryFromV1(item: z.infer<typeof grantSummaryV1Schema>): GrantSumm
   };
 }
 
+function mapSummaryFromV1Result(item: z.infer<typeof grantSummaryV1ResultSchema>): GrantSummary {
+  return {
+    id: item.id,
+    title: item.title,
+    organization: item.name,
+    deadline: item.acceptance_end_datetime,
+    region: item.target_area_search
+  };
+}
+
 function mapDetailFromV2(item: z.infer<typeof grantDetailV2Schema>): GrantDetail {
   return {
     id: item.id,
@@ -117,6 +155,16 @@ function mapDetailFromV2(item: z.infer<typeof grantDetailV2Schema>): GrantDetail
     eligibility: item.eligibility,
     subsidyRate: item.subsidy_rate,
     contact: item.contact
+  };
+}
+
+function mapDetailFromV2Result(item: z.infer<typeof grantDetailV2ResultSchema>): GrantDetail {
+  return {
+    id: item.id,
+    title: item.title,
+    organization: item.name,
+    region: item.target_area_search,
+    description: item.detail ?? undefined
   };
 }
 
@@ -145,25 +193,48 @@ function parseSearchV2(body: unknown): GrantSummary[] {
 function parseSearchV1(body: unknown): GrantSummary[] {
   const parsed = searchResponseV1Schema.safeParse(body);
   if (!parsed.success) {
+    if (body && typeof body === "object") {
+      const keys = Object.keys(body as Record<string, unknown>);
+      logWarn("jgrants search payload shape mismatch", {
+        keys,
+        sample: JSON.stringify(body).slice(0, 300)
+      });
+    }
     throw new Error(`Invalid v1 search payload: ${parsed.error.issues[0]?.message ?? "schema error"}`);
   }
 
   if ("items" in parsed.data) {
     return parsed.data.items.map(mapSummaryFromV1);
   }
-  return parsed.data.data.map(mapSummaryFromV1);
+  if ("data" in parsed.data) {
+    return parsed.data.data.map(mapSummaryFromV1);
+  }
+  return parsed.data.result.map((item) =>
+    "subsidy_id" in item ? mapSummaryFromV1(item) : mapSummaryFromV1Result(item)
+  );
 }
 
 function parseDetailV2(body: unknown): GrantDetail {
   const parsed = detailResponseV2Schema.safeParse(body);
   if (!parsed.success) {
+    if (body && typeof body === "object") {
+      const keys = Object.keys(body as Record<string, unknown>);
+      logWarn("jgrants detail payload shape mismatch", {
+        keys,
+        sample: JSON.stringify(body).slice(0, 300)
+      });
+    }
     throw new Error(`Invalid v2 detail payload: ${parsed.error.issues[0]?.message ?? "schema error"}`);
   }
 
   if ("item" in parsed.data) {
     return mapDetailFromV2(parsed.data.item);
   }
-  return mapDetailFromV2(parsed.data.data);
+  if ("data" in parsed.data) {
+    return mapDetailFromV2(parsed.data.data);
+  }
+  const first = parsed.data.result[0];
+  return "organization" in first ? mapDetailFromV2(first) : mapDetailFromV2Result(first);
 }
 
 function parseDetailV1(body: unknown): GrantDetail {
@@ -196,20 +267,21 @@ async function requestJson(
   path: string,
   context: { requestId: string; operation: "search" | "detail"; apiVersion: "v1" | "v2" },
   query?: URLSearchParams
-): Promise<{ status: number; body: unknown; durationMs: number }> {
+): Promise<{ status: number; body: unknown; durationMs: number; url: string }> {
   const url = `${baseUrl}${path}${query ? `?${query.toString()}` : ""}`;
   const startedAt = Date.now();
 
   try {
     const response = await fetch(url, { headers: authHeader(token) });
     const body = await response.json().catch(() => null);
-    return { status: response.status, body, durationMs: Date.now() - startedAt };
+    return { status: response.status, body, durationMs: Date.now() - startedAt, url };
   } catch (error) {
     logError("jgrants request failed", {
       requestId: context.requestId,
       operation: context.operation,
       endpoint: path,
       apiVersion: context.apiVersion,
+      url,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -225,46 +297,6 @@ export async function searchGrants(
   const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
   const params = buildSearchParams(query);
-  const v2 = await requestJson(
-    token,
-    V2_BASE_URL,
-    "/subsidies",
-    { requestId, operation: "search", apiVersion: "v2" },
-    params
-  );
-
-  if (v2.status >= 200 && v2.status < 300) {
-    const grants = parseSearchV2(v2.body);
-    logInfo("jgrants search completed", {
-      requestId,
-      apiVersion: "v2",
-      status: v2.status,
-      resultCount: grants.length,
-      durationMs: Date.now() - startedAt
-    });
-    return grants;
-  }
-
-  if (!shouldFallback(v2.status)) {
-    logWarn("jgrants search failed without fallback", {
-      requestId,
-      endpoint: "/subsidies",
-      apiVersion: "v2",
-      status: v2.status,
-      durationMs: v2.durationMs
-    });
-    throw new Error(`Search failed on v2: ${v2.status}`);
-  }
-
-  logWarn("Fallback to v1 for search", {
-    requestId,
-    endpoint: "/subsidies",
-    fromVersion: "v2",
-    toVersion: "v1",
-    status: v2.status,
-    durationMs: v2.durationMs,
-    query
-  });
   const v1 = await requestJson(
     token,
     V1_BASE_URL,
@@ -284,13 +316,16 @@ export async function searchGrants(
     return grants;
   }
 
-  logWarn("jgrants search failed after fallback", {
+  logWarn("jgrants search failed without fallback", {
     requestId,
-    v2Status: v2.status,
-    v1Status: v1.status,
-    totalDurationMs: Date.now() - startedAt
+    endpoint: "/subsidies",
+    apiVersion: "v1",
+    status: v1.status,
+    durationMs: v1.durationMs,
+    url: v1.url,
+    query: Object.fromEntries(params.entries())
   });
-  throw new Error(`Search failed on v2(${v2.status}) and v1(${v1.status})`);
+  throw new Error(`Search failed on v1: ${v1.status}`);
 }
 
 export async function fetchGrantDetail(
@@ -300,7 +335,7 @@ export async function fetchGrantDetail(
 ): Promise<GrantDetail> {
   const requestId = trace?.requestId ?? createRequestId();
   const startedAt = Date.now();
-  const endpoint = `/subsidies/${grantId}`;
+  const endpoint = `/subsidies/id/${grantId}`;
   const v2 = await requestJson(
     token,
     V2_BASE_URL,
@@ -325,7 +360,8 @@ export async function fetchGrantDetail(
       endpoint,
       apiVersion: "v2",
       status: v2.status,
-      durationMs: v2.durationMs
+      durationMs: v2.durationMs,
+      url: v2.url
     });
     throw new Error(`Detail failed on v2: ${v2.status}`);
   }
@@ -336,7 +372,8 @@ export async function fetchGrantDetail(
     fromVersion: "v2",
     toVersion: "v1",
     status: v2.status,
-    durationMs: v2.durationMs
+    durationMs: v2.durationMs,
+    url: v2.url
   });
   const v1 = await requestJson(token, V1_BASE_URL, endpoint, {
     requestId,
@@ -360,7 +397,9 @@ export async function fetchGrantDetail(
     grantId,
     v2Status: v2.status,
     v1Status: v1.status,
-    totalDurationMs: Date.now() - startedAt
+    totalDurationMs: Date.now() - startedAt,
+    v2Url: v2.url,
+    v1Url: v1.url
   });
   throw new Error(`Detail failed on v2(${v2.status}) and v1(${v1.status})`);
 }

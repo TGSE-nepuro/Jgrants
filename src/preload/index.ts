@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { FavoriteGrant, GrantSearchQuery, GrantSummary, RequestTraceContext } from "../shared/types";
+import {
+  FavoriteGrant,
+  GrantSearchQuery,
+  GrantSummary,
+  LogEntry,
+  RequestTraceContext
+} from "../shared/types";
 
 contextBridge.exposeInMainWorld("jgrantsApi", {
   search: (token: string, query: GrantSearchQuery, trace?: RequestTraceContext) =>
@@ -14,5 +20,7 @@ contextBridge.exposeInMainWorld("jgrantsApi", {
   exportCsv: (grants: GrantSummary[]) => ipcRenderer.invoke("grants:exportCsv", grants),
   getToken: () => ipcRenderer.invoke("token:get"),
   setToken: (token: string) => ipcRenderer.invoke("token:set", token),
-  clearToken: () => ipcRenderer.invoke("token:clear")
+  clearToken: () => ipcRenderer.invoke("token:clear"),
+  listLogs: (): Promise<LogEntry[]> => ipcRenderer.invoke("logs:list"),
+  clearLogs: () => ipcRenderer.invoke("logs:clear")
 });

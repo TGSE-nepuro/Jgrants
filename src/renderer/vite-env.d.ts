@@ -5,6 +5,7 @@ import {
   GrantDetail,
   GrantSearchQuery,
   GrantSummary,
+  LogEntry,
   RequestTraceContext
 } from "../shared/types";
 
@@ -25,6 +26,8 @@ declare global {
       getToken: () => Promise<string>;
       setToken: (token: string) => Promise<{ ok: boolean }>;
       clearToken: () => Promise<{ ok: boolean }>;
+      listLogs: () => Promise<LogEntry[]>;
+      clearLogs: () => Promise<{ ok: boolean }>;
     };
   }
 }

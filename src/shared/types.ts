@@ -1,6 +1,9 @@
 export type GrantSearchQuery = {
   keyword?: string;
   region?: string;
+  sort?: string;
+  order?: "ASC" | "DESC";
+  acceptance?: "0" | "1";
   openFrom?: string;
   openTo?: string;
 };
@@ -29,4 +32,11 @@ export type FavoriteGrant = {
 
 export type RequestTraceContext = {
   requestId?: string;
+};
+
+export type LogEntry = {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  message: string;
+  meta?: unknown;
 };

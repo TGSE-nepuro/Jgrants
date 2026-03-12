@@ -33,12 +33,15 @@ export function maskForLog(value: unknown): unknown {
   return maskUnknown(value);
 }
 
-export function buildLogEntry(level: LogLevel, message: string, meta?: unknown): string {
-  const payload = {
+export function buildLogPayload(level: LogLevel, message: string, meta?: unknown) {
+  return {
     timestamp: new Date().toISOString(),
     level,
     message,
     meta: maskForLog(meta)
   };
-  return JSON.stringify(payload);
+}
+
+export function buildLogEntry(level: LogLevel, message: string, meta?: unknown): string {
+  return JSON.stringify(buildLogPayload(level, message, meta));
 }
