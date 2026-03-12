@@ -155,6 +155,13 @@ function parseSearchV2(body: unknown): GrantSummary[] {
 function parseSearchV1(body: unknown): GrantSummary[] {
   const parsed = searchResponseV1Schema.safeParse(body);
   if (!parsed.success) {
+    if (body && typeof body === "object") {
+      const keys = Object.keys(body as Record<string, unknown>);
+      logWarn("jgrants search payload shape mismatch", {
+        keys,
+        sample: JSON.stringify(body).slice(0, 300)
+      });
+    }
     throw new Error(`Invalid v1 search payload: ${parsed.error.issues[0]?.message ?? "schema error"}`);
   }
 
