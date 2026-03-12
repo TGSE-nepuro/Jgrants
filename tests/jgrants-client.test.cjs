@@ -230,6 +230,21 @@ test('fetchGrantDetail handles invalid json response as missing payload', async 
   await assert.rejects(() => fetchGrantDetail('token', 'x3'), /Invalid v2 detail payload/);
 });
 
+test('fetchGrantDetail accepts v2 result payload with detail fields', async () => {
+  queueFetch([
+    {
+      status: 200,
+      body: { result: [{ id: 'd-1', name: 'S-1', title: '補助金D', detail: '概要' }] }
+    }
+  ]);
+
+  const detail = await fetchGrantDetail('token', 'd-1');
+  assert.equal(detail.id, 'd-1');
+  assert.equal(detail.title, '補助金D');
+  assert.equal(detail.organization, 'S-1');
+  assert.equal(detail.description, '概要');
+});
+
 test('requestJson network errors are logged with request context', async () => {
   const errors = captureConsoleJson('error');
   queueFetch([{ throwError: new Error('network down hard') }]);
