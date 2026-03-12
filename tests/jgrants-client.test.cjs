@@ -101,6 +101,18 @@ test('searchGrants omits Authorization header when token is empty', async () => 
   assert.equal(authValue, undefined);
 });
 
+test('searchGrants defaults keyword when blank', async () => {
+  let capturedUrl = '';
+  global.fetch = async (url) => {
+    capturedUrl = String(url);
+    return mockResponse(200, { items: [] });
+  };
+
+  await searchGrants('token', { keyword: '  ' });
+  const url = new URL(capturedUrl);
+  assert.equal(url.searchParams.get('keyword'), '補助金');
+});
+
 test('searchGrants rejects invalid v1 payload shape after fallback', async () => {
   queueFetch([{ status: 200, body: { items: [{ subsidy_id: 's-1', name: '補助金A' }] } }]);
 

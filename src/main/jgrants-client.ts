@@ -77,7 +77,8 @@ function authHeader(token: string): HeadersInit {
 
 function buildSearchParams(query: GrantSearchQuery): URLSearchParams {
   const params = new URLSearchParams();
-  if (query.keyword) params.set("keyword", query.keyword);
+  const keyword = query.keyword?.trim() || "補助金";
+  params.set("keyword", keyword);
   params.set("sort", query.sort ?? "acceptance_end_datetime");
   params.set("order", query.order ?? "ASC");
   params.set("acceptance", query.acceptance ?? "1");
