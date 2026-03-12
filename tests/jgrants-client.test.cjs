@@ -140,6 +140,20 @@ test('searchGrants accepts v1 payload using result key', async () => {
   assert.equal(result[0].title, '補助金X');
 });
 
+test('searchGrants accepts v1 result payload with id/title fields', async () => {
+  queueFetch([
+    {
+      status: 200,
+      body: { result: [{ id: 'r-1', name: 'S-0001', title: '補助金Y', target_area_search: '東京都' }] }
+    }
+  ]);
+
+  const result = await searchGrants('token', { keyword: 'result2' });
+  assert.equal(result[0].id, 'r-1');
+  assert.equal(result[0].title, '補助金Y');
+  assert.equal(result[0].organization, 'S-0001');
+});
+
 test('searchGrants propagates network error', async () => {
   queueFetch([{ throwError: new Error('network down') }]);
   await assert.rejects(() => searchGrants('token', { keyword: 'security' }), /network down/);

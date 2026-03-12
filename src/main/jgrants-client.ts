@@ -26,6 +26,14 @@ const grantSummaryV1BaseSchema = z.object({
   target_region: z.string().optional()
 });
 
+const grantSummaryV1ResultSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  title: z.string(),
+  target_area_search: z.string().optional(),
+  acceptance_end_datetime: z.string().optional()
+});
+
 const grantSummaryV1Schema = grantSummaryV1BaseSchema.refine(
   (value) => Boolean(value.organization_name || value.ministry),
   {
@@ -55,7 +63,7 @@ const searchResponseV2Schema = z.object({ items: z.array(grantSummaryV2Schema) }
 const searchResponseV1Schema = z.union([
   z.object({ items: z.array(grantSummaryV1Schema) }),
   z.object({ data: z.array(grantSummaryV1Schema) }),
-  z.object({ result: z.array(grantSummaryV1Schema) })
+  z.object({ result: z.array(z.union([grantSummaryV1Schema, grantSummaryV1ResultSchema])) })
 ]);
 
 const detailResponseV2Schema = z.union([
@@ -116,6 +124,16 @@ function mapSummaryFromV1(item: z.infer<typeof grantSummaryV1Schema>): GrantSumm
   };
 }
 
+function mapSummaryFromV1Result(item: z.infer<typeof grantSummaryV1ResultSchema>): GrantSummary {
+  return {
+    id: item.id,
+    title: item.title,
+    organization: item.name,
+    deadline: item.acceptance_end_datetime,
+    region: item.target_area_search
+  };
+}
+
 function mapDetailFromV2(item: z.infer<typeof grantDetailV2Schema>): GrantDetail {
   return {
     id: item.id,
@@ -171,7 +189,9 @@ function parseSearchV1(body: unknown): GrantSummary[] {
   if ("data" in parsed.data) {
     return parsed.data.data.map(mapSummaryFromV1);
   }
-  return parsed.data.result.map(mapSummaryFromV1);
+  return parsed.data.result.map((item) =>
+    "subsidy_id" in item ? mapSummaryFromV1(item) : mapSummaryFromV1Result(item)
+  );
 }
 
 function parseDetailV2(body: unknown): GrantDetail {
